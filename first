@@ -1,0 +1,354 @@
+import psycopg2 as pg
+import networkx as nx
+import pandas as pd
+import pandas.io.sql as psql
+import os
+from tqdm.notebook import tqdm
+from itertools import product
+import pickle
+import numpy as np
+
+# connect to CODA DB
+conn = pg.connect(host = 'heart5.kaist.ac.kr', dbname="CODAv3.0", user='bisler', password='bislaprom3')
+cur = conn.cursor()
+
+def create_network(coda_df):
+  relation_df = coda_df[['leftentityid', 'rightentityid']]
+  relation_df = relation_df.drop_duplicates()
+  reverse_df = coda_df.loc[coda_df['association']=='Undirected_Link'][['rightentityid', 'leftentityid']]
+  reverse_df = reverse_df.rename(columns={'rightentityid':'leftentityid', 'leftentityid':'rightentityid'})
+  reverse_df = reverse_df.drop_duplicates()
+  relation_df = pd.concat([relation_df, reverse_df])
+  g = nx.from_pandas_edgelist(relation_df, 'leftentityid', 'rightentityid', create_using=nx.DiGraph())
+  return g
+
+def get_edge_list(coda_df):
+  relation_df = coda_df[['leftentityid', 'rightentityid']]
+  relation_df = relation_df.drop_duplicates()
+  return relation_df
+
+def execute_sql_to_df(conn, sql_query):
+  return psql.read_sql(sql_query, conn)
+  
+  def get_gene_name(entrezid):
+    sql_query = "SELECT symbol FROM gene where entrezid = '{}'".format(entrezid)
+    cur.execute(sql_query)
+    try:
+        symbol = cur.fetchone()[0]
+        return symbol
+    except:
+        pass
+    
+def get_gene_id(symbol):
+    sql_query = "SELECT entrezid FROM gene where symbol = '{}' and ncbitaxid = '9606'".format(symbol.upper())
+    cur.execute(sql_query)
+    try:
+        entrezid = cur.fetchone()[0]
+        return entrezid
+    except:
+        pass
+
+def to_dictionary(entrezid_list):
+    result = dict()
+    for entrezid in tqdm(entrezid_list):
+        symbol = get_gene_name(entrezid)
+        if symbol is not None:
+            symbol = symbol.upper()
+            result[symbol] = entrezid
+    return result
+    
+def symbol2GE(symbol_list):
+    result = list()
+    for symbol in symbol_list:
+        try:
+            sql_query = "SELECT geneid from gene where symbol = '{}' and ncbitaxid = '9606'".format(symbol.upper())
+            cur = conn.cursor()
+            cur.execute(sql_query)
+            geid = cur.fetchone()[0]
+            result.append(geid)
+        except:
+            print(symbol)
+    return result
+
+def GE2GP(ge_list):
+    result = list()
+    for ge in ge_list:
+        sql_query = "select geneproductid from geneproduct where geneid = '{}'".format(ge)
+        cur = conn.cursor()
+        cur.execute(sql_query)
+        gpids = cur.fetchall()
+        gpids = [gpid[0] for gpid in gpids]
+        result += gpids
+    return result
+
+def GP2symbol(gp_list):
+    result = list()
+    for gp in gp_list:
+        sql_query = "select symbol from geneproduct where geneproductid = '{}'".format(gp)
+        cur = conn.cursor()
+        cur.execute(sql_query)
+        symbol = cur.fetchone()[0]
+        result.append(symbol)
+    return result
+
+def GP2symbol_single(gp):
+    sql_query = "select symbol from geneproduct where geneproductid = '{}'".format(gp)
+    cur = conn.cursor()
+    cur.execute(sql_query)
+    try:
+        symbol = cur.fetchone()[0]
+    except:
+        symbol = None
+    return symbol
+
+def filter_gene_in_g(g, gene_list):
+    return [gene for gene in gene_list if g.has_node(gene)]
+    
+# select non-context relations
+sql_query = "SELECT * FROM knowledgeunit where leftorganid is Null and lefttissueid is Null and leftcellid is Null and rightorganid is Null and righttissueid is Null and rightcellid is Null and associationcontext is Null and lefttype='GP' and righttype='GP';"
+non_context_df = execute_sql_to_df(conn, sql_query)
+
+non_context_df
+
+# create network
+ppi_df = non_context_df[(non_context_df['lefttype']=='GP') & (non_context_df['righttype']=='GP')]
+
+GP_list = list(set(ppi_df['leftentityid'].to_list())) + list(set(ppi_df['rightentityid'].to_list()))
+GP_list = list(set(GP_list))
+
+symbol_list = GP2symbol(GP_list)
+zip_iterator = zip(GP_list, symbol_list)
+gp_symbol_dict = dict(zip_iterator)
+
+ppi_df['leftentityid'] = ppi_df['leftentityid'].apply(lambda x: get_gene_id(gp_symbol_dict[x]))
+ppi_df['rightentityid'] = ppi_df['rightentityid'].apply(lambda x: get_gene_id(gp_symbol_dict[x]))
+
+ppi_df
+
+ppi_df.loc[(ppi_df['leftentityid'] == '1961') & (ppi_df['rightentityid'] == '1749')]
+
+none_df = non_context_df[non_context_df['kuid'].isin(list(ppi_df[TF]['kuid'].values))]
+
+none_df['leftentityid'] = none_df['leftentityid'].apply(lambda x: gp_symbol_dict[x])
+none_df['rightentityid'] = none_df['rightentityid'].apply(lambda x: gp_symbol_dict[x])
+
+none_df
+
+# Proteincomplex deletion
+print("Length of none_df is " + str(len(none_df['kuid'])))
+
+pc_num = 0
+
+for kuid in none_df['kuid']:
+    test_df = none_df[none_df['kuid']==kuid]
+    test_df
+    if test_df['leftentityid'].values == 'ProteinComplex' or test_df['rightentityid'].values == 'ProteinComplex':
+        pc_num += 1
+        
+print("Total number of Protein Complex rows is " + str(pc_num))
+
+if len(none_df['kuid']) == pc_num:
+    print("\n All None is ProteinComplex")
+
+# We need to delete "Protein Complex" in the dataframe
+sum((ppi_df['leftentityid'].notna()) & (ppi_df['rightentityid'].notna()))
+
+sum(ppi_df['leftentityid'].notna())
+
+sum(ppi_df['leftentityid'].isna())
+
+ppi_df_notna = ppi_df[(ppi_df['leftentityid'].notna()) & (ppi_df['rightentityid'].notna())] # ppi dataframe with no NaN
+
+ppi_df_notna = ppi_df_notna.reset_index(drop=True) # index reset
+
+ppi_df_notna
+
+ppi_df_notna = ppi_df[(ppi_df['leftentityid'].notna()) & (ppi_df['rightentityid'].notna())] # ppi dataframe with no NaN
+
+ppi_df_notna = ppi_df_notna.reset_index(drop=True) # index reset
+
+ppi_df_notna
+
+# PDC gene check
+
+ppi_df_notna.loc[(ppi_df_notna['leftentityid'] == '80201') | (ppi_df_notna['rightentityid'] == '80201')]
+
+import json
+
+with open('kegg/ko00001.json', 'r') as f:
+    json_data = json.load(f)
+    
+first_list = json_data['children'] # metabolism # Carbohydrate metabolism # Glycolysis
+
+total_KO = []
+
+for i in range(len(first_list)):
+    for j in range(len(first_list[i]['children'][j])):
+        for k in range(len(first_list[i]['children'][j]['children'])):
+            if 'children' in first_list[i]['children'][j]['children'][k]:
+                for l in range(len(first_list[i]['children'][j]['children'][k]['children'])):
+                    #print(first_list[i]['children'][j]['children'][k]['children'][l])
+                    ref = first_list[i]['children'][j]['children'][k]['children'][l]['name']
+                    ref2 = ref.split('  ')
+                    ref3 = ref2[0]
+                    total_KO.append(ref3)
+                    
+ total_KO
+ 
+ # KEGG Ontology (KO) --> gene (KEGG API)
+ 
+ import Bio.KEGG.REST as kegg
+
+f = kegg.kegg_find('genes', 'K00844') # one KO term <-> multiple genes
+
+while True:
+    line = f.readline()
+    if not line:
+        break
+    if 'hsa' in line: # only return KO terms with 'hsa' (homo sapiens)
+        print(line)
+
+f.close()
+
+len(total_KO)
+
+import time
+
+start = time.time()
+
+# KO term -(convert)-> entrez id
+ind = 0
+KO2gene = {}
+
+for KO in total_KO:
+    ind += 1   
+    f = kegg.kegg_find('genes', KO)    
+    gene_list = [] # KO's genes   
+    while True:
+        line = f.readline()
+        if not line:
+            break        
+        if 'hsa' == line.split(':')[0]: # only return KO terms with 'hsa' (homo sapiens)
+            gene_list.append(line.split(':')[1].split('\t')[0])            
+    KO2gene[KO] = gene_list
+    f.close()
+    
+    if ind%10 == 0:
+        print(str(ind) + ' / ' + str(len(total_KO)))
+        
+print("time :", time.time() - start)
+
+dict(list(KO2gene.items())[:10]) # KO2gene file check
+
+# write tsv file in the case of emergency
+
+import csv
+
+with open("KO2gene.tsv", "w", encoding="utf-8") as f:
+    tw = csv.writer(f, delimiter="\t")
+    tw.writerow(['KO', 'Entrez ID'])
+    for element in KO2gene:
+        tw.writerow([element, KO2gene[element]])
+        
+ total_gene = [] # total genes in KEGG pathway
+
+for KO in total_KO:
+    total_gene += KO2gene[KO]
+    
+print("The number of genes in KEGG pathway is " + str(len(list(set(total_gene)))))
+
+# create network
+import networkx as nx
+
+ppi_g = nx.Graph()
+
+for index, row in ppi_df_notna.iterrows():
+    ppi_g.add_edge(row['leftentityid'], row['rightentityid'])
+
+# create network
+import networkx as nx
+
+ppi_g = nx.Graph()
+
+for index, row in ppi_df_notna.iterrows():
+    ppi_g.add_edge(row['leftentityid'], row['rightentityid'])
+    
+len(ppi_g.nodes)
+
+# Does the genes exist in CODA ppi network?
+
+out_gene = [] # genes that are not included in PPI network
+
+ind = 0
+
+for gene in list(set(total_gene)):
+    if gene in ppi_g.nodes:
+        ind += 1
+    else:
+        out_gene.append(gene)
+        
+print("The number of genes that exist both in CODA & KEGG : " + str(ind) + ' / ' + str(len(ppi_g.nodes)))
+
+print("<< Genes that are not in PPI network >>")
+for id in out_gene[:10]:
+    symbol = get_gene_name(id)
+    print(symbol)
+    
+# pathway dictionary {pathway1 : KO1, KO2, ...}
+pathway2KO = {}
+
+for i in range(len(first_list)):
+    for j in range(len(first_list[i]['children'][j])):
+        for k in range(len(first_list[i]['children'][j]['children'])):
+            if 'children' in first_list[i]['children'][j]['children'][k]:
+                gene_list = []
+                for l in range(len(first_list[i]['children'][j]['children'][k]['children'])):
+                    ref = first_list[i]['children'][j]['children'][k]['children'][l]['name']
+                    ref2 = ref.split('  ')
+                    ref3 = ref2[0]
+                    gene_list += KO2gene[ref3]
+                pathway2KO[first_list[i]['children'][j]['children'][k]['name']] = gene_list
+                
+ test_gene = pathway2KO['00010 Glycolysis / Gluconeogenesis [PATH:ko00010]']
+
+ppi_g_test = ppi_g.subgraph(test_gene)
+
+[len(c) for c in sorted(nx.connected_components(ppi_g_test), key=len, reverse=True)]
+
+# Homecoming 
+import pandas as pd
+
+answer = ['감혜진','강이옥','강효진','권미진','권용주','김기범','김기슭','김덕용','김상우','김준호','김진수','나도균','남호정','류준영','류하선','박병률','박인호','박정호','백효정','서성렬','성경아','신문식','신미이','신준범','양수영','우승호','유윤주','윤동빈','윤정근','이대중','이서우','이선재','이세준','이은영','이재현','이종안','이준학','이준혁','이지형','이초롱','이태형','장동진','장정훈','장준영','전세준','정류광','정성원','정순욱','조수지','조재영','최주은','최충원','하수현','한아름','홍석근','황소현','황용득','황우창','황재환', '송윤선']
+
+my_part_BISL = ['김대원','문석현','Haitao Wen','박세환','감혜진','강신후','고병권','고영준','곽수근','김창범','신준범','이경휴','김재호','신승우','김진수','박찬일','이권형','이재형','이정식','이진우','이현호','임소정','전진환','정해임','차진용','한정호','홍희경','유철규','이규연','정봉찬','황재환','정종한','조수지','이필현','James W. J. Jhang']
+my_part_BIIG = ['최성원','한동훈','고병권','문희철','박승재','박주웅','강병준','고영준','곽수근','김낙곤','김요셉','김진두','민태원','박재범','백승우','손현우','신성욱','이정식','이진우','이현호','임소정','전진환','정연철','지명훈','최선웅','홍희경','강신후','고낙일','권상희','김경록','김상연','김성준','김수진','노용택','류준영','박병률','박종인','안용수','윤성준','이권형','이병철','이재곤','이재형','이정훈','이초롱','이해성','전재호','차진용','최석원','고병권','고수환','권오훈','김경환','김기중','김윤경','김종훈','목정민','문희철','박선민','박주일','방윤식','성태환','손주영','신미이','심규호','육덕수','이성규','장아침','정영훈','정해임','조성진','차정인','최준호','한정호','황장진','권용주','김동현','김민','김민성','김범진','김시연','김영수','김유중','김정우','김진욱','김형석','김형중','박광수','박시수','성태석','송종훈','송충규','유윤정','이승배','이재유','임도원','장정훈','정부경','홍석준','김기범','김기슭','김영필','김재용','김재홍','김중호','김한별','문예원','박성준','박세영','손용석','송화선','신준섭','심충만','오상도','오정연','이동희','이지수','이학준','이호준','임지선','장시복','전승민','정상균','정재형','조용탁']
+my_part = my_part_BISL + my_part_BIIG
+
+good_people = []
+
+for person in answer:
+  if person in my_part:
+    print(person)
+    good_people.append(person)
+    
+answer_df = pd.read_csv('2022 BISL Virtual Homecoming Registration.tsv', delimiter = '\t')
+
+my_answer_df = answer_df[answer_df['Name'].isin(good_people)]
+my_answer_df = my_answer_df.reset_index()
+
+participate = {}
+not_participate = {}
+
+for i in range(len(my_answer_df['Name'])):
+    if '네' in my_answer_df.loc[i][6]:
+        if my_answer_df.loc[i][2] in my_part_BISL:
+            participate[my_answer_df.loc[i][2]] = 'BISL'
+        else:
+            participate[my_answer_df.loc[i][2]] = 'BIIG'
+    else:
+        if my_answer_df.loc[i][2] in my_part_BISL:
+            not_participate[my_answer_df.loc[i][2]] = 'BISL'
+        else:
+            not_participate[my_answer_df.loc[i][2]] = 'BIIG'
+            
+participate
