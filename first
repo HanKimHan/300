@@ -315,44 +315,6 @@ ppi_g_test = ppi_g.subgraph(test_gene)
 
 [len(c) for c in sorted(nx.connected_components(ppi_g_test), key=len, reverse=True)]
 
-# Homecoming 
-import pandas as pd
-
-answer = ['감혜진','강이옥','강효진','권미진','권용주','김기범','김기슭','김덕용','김상우','김준호','김진수','나도균','남호정','류준영','류하선','박병률','박인호','박정호','백효정','서성렬','성경아','신문식','신미이','신준범','양수영','우승호','유윤주','윤동빈','윤정근','이대중','이서우','이선재','이세준','이은영','이재현','이종안','이준학','이준혁','이지형','이초롱','이태형','장동진','장정훈','장준영','전세준','정류광','정성원','정순욱','조수지','조재영','최주은','최충원','하수현','한아름','홍석근','황소현','황용득','황우창','황재환', '송윤선']
-
-my_part_BISL = ['김대원','문석현','Haitao Wen','박세환','감혜진','강신후','고병권','고영준','곽수근','김창범','신준범','이경휴','김재호','신승우','김진수','박찬일','이권형','이재형','이정식','이진우','이현호','임소정','전진환','정해임','차진용','한정호','홍희경','유철규','이규연','정봉찬','황재환','정종한','조수지','이필현','James W. J. Jhang']
-my_part_BIIG = ['최성원','한동훈','고병권','문희철','박승재','박주웅','강병준','고영준','곽수근','김낙곤','김요셉','김진두','민태원','박재범','백승우','손현우','신성욱','이정식','이진우','이현호','임소정','전진환','정연철','지명훈','최선웅','홍희경','강신후','고낙일','권상희','김경록','김상연','김성준','김수진','노용택','류준영','박병률','박종인','안용수','윤성준','이권형','이병철','이재곤','이재형','이정훈','이초롱','이해성','전재호','차진용','최석원','고병권','고수환','권오훈','김경환','김기중','김윤경','김종훈','목정민','문희철','박선민','박주일','방윤식','성태환','손주영','신미이','심규호','육덕수','이성규','장아침','정영훈','정해임','조성진','차정인','최준호','한정호','황장진','권용주','김동현','김민','김민성','김범진','김시연','김영수','김유중','김정우','김진욱','김형석','김형중','박광수','박시수','성태석','송종훈','송충규','유윤정','이승배','이재유','임도원','장정훈','정부경','홍석준','김기범','김기슭','김영필','김재용','김재홍','김중호','김한별','문예원','박성준','박세영','손용석','송화선','신준섭','심충만','오상도','오정연','이동희','이지수','이학준','이호준','임지선','장시복','전승민','정상균','정재형','조용탁']
-my_part = my_part_BISL + my_part_BIIG
-
-good_people = []
-
-for person in answer:
-  if person in my_part:
-    print(person)
-    good_people.append(person)
-    
-answer_df = pd.read_csv('2022 BISL Virtual Homecoming Registration.tsv', delimiter = '\t')
-
-my_answer_df = answer_df[answer_df['Name'].isin(good_people)]
-my_answer_df = my_answer_df.reset_index()
-
-participate = {}
-not_participate = {}
-
-for i in range(len(my_answer_df['Name'])):
-    if '네' in my_answer_df.loc[i][6]:
-        if my_answer_df.loc[i][2] in my_part_BISL:
-            participate[my_answer_df.loc[i][2]] = 'BISL'
-        else:
-            participate[my_answer_df.loc[i][2]] = 'BIIG'
-    else:
-        if my_answer_df.loc[i][2] in my_part_BISL:
-            not_participate[my_answer_df.loc[i][2]] = 'BISL'
-        else:
-            not_participate[my_answer_df.loc[i][2]] = 'BIIG'
-            
-participate
-
 # proximity measure
 
 dd_interaction = pd.read_excel('drug_disease_interaction.xlsx')
