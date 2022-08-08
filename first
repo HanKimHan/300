@@ -401,3 +401,38 @@ node_num = [len(c) for c in sorted(nx.connected_components(ppi_g_park), key=len,
 ppi_g_park_G0.remove_edges_from(nx.selfloop_edges(ppi_g_park_G0))
 
 nx.draw(ppi_g_park_G0)
+
+drug_gene = pd.read_csv('drug_gene_interaction.tsv', delimiter = '\t')
+
+drug_gene.head()
+
+drug_disease_pair = []
+
+for i in range(dd_interaction.shape[0]):
+    if dd_interaction['In FDA label'][i] == 1:
+        ind += 1
+        drug = dd_interaction['Drugbank ID'][i] # interaction table에서 뽑아낸 약물
+        disease = dd_interaction['Disease'][i] # interaction table에서 뽑아낸 질병
+        drug_disease_pair.append((drug, disease))
+        
+drug_disease_pair[:10]
+
+# parkinson disease related drugs
+pd_drug = []
+
+for pair in drug_disease_pair:
+    if'parkinson disease' in pair:
+        pd_drug.append(pair[0])
+    elif 'parkinsonian disorders' in pair:
+        pd_drug.append(pair[0])
+
+pd_drug
+
+for drug in pd_drug:
+    pd_drug_genes = drug_gene[drug_gene['DrugBank ID'] == drug].values
+    pd_drug_genes = pd_drug_genes[~pd.isna(pd_drug_genes)][1:]
+    
+    for gene in pd_drug_genes:
+        ppi_g.add_edge(drug, gene)
+        
+ppi_g.adj['DB01367']
