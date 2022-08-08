@@ -1,0 +1,48 @@
+# proximity measure
+
+dd_interaction = pd.read_excel('drug_disease_interaction.xlsx')
+dd_proximity = pd.read_excel('drug_disease_proximity.xlsx')
+
+dd_proximity.head()
+
+# drug - gene interaction (dictionary)
+drug_gene = pd.read_csv('disease_gene_interaction.tsv', delimiter = '\t')
+
+drug_gene.head()
+
+# drug - gene interaction (dictionary)
+import math
+
+drug_gene_dict = {}
+
+for i in range(len(drug_gene)): # number of rows
+    row = drug_gene.loc[i]
+    if str(row[4]) == 'nan': # Is OMIM genes NaN?
+        omim_genes = []
+    else:
+        omim_genes = row[4].split(';')
+    
+    if str(row[5]) == 'nan': # Is GWAS genes NaN?
+        gwas_genes = []
+    else:
+        gwas_genes = row[5].split(';')
+
+    drug_gene_dict[row[0]] = omim_genes + gwas_genes
+    
+    # Parkinson's disease related genes
+
+drug_gene_dict['parkinson disease'][:10]
+
+# Parkinson's disease related genes subgraph in CODA PPI network
+ppi_g_park = ppi_g.subgraph(drug_gene_dict['parkinson disease'])
+
+# Parkinson's disease related genes largest connected components
+ppi_g_park_cc = sorted(nx.connected_components(ppi_g_park), key=len, reverse=True)
+ppi_g_park_G0 = ppi_g.subgraph(ppi_g_park_cc[0])
+
+# Number of nodes in Parkinson's disease's connected component
+node_num = [len(c) for c in sorted(nx.connected_components(ppi_g_park), key=len, reverse=True)]
+
+ppi_g_park_G0.remove_edges_from(nx.selfloop_edges(ppi_g_park_G0))
+
+nx.draw(ppi_g_park_G0)
