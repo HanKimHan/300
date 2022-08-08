@@ -428,11 +428,16 @@ for pair in drug_disease_pair:
 
 pd_drug
 
+drug_gene_dict = {}
+
 for drug in pd_drug:
     pd_drug_genes = drug_gene[drug_gene['DrugBank ID'] == drug].values
     pd_drug_genes = pd_drug_genes[~pd.isna(pd_drug_genes)][1:]
     
+    gene_list = []
     for gene in pd_drug_genes:
-        ppi_g.add_edge(drug, gene)
-        
-ppi_g.adj['DB01367']
+        gene_list.append(gene)
+    
+    drug_gene_dict[drug] = gene_list
+    
+drug_gene_dict['DB00245']
