@@ -15,3 +15,69 @@ for element in kegg_ref_df:
     
 print("<Examples of the KEGG reference id>")
 print(kegg_id[:10])
+
+# List of edges that exist in kegg pathway
+# Dataframe that contains edges with entrez id is "ppi_df_notna"
+edge_ref_dict = {}
+
+for i in range(len(ppi_df_notna)):
+    row = ppi_df_notna.loc[i]
+    edge_ref_dict[(row['leftentityid'], row['rightentityid'])] = row['referenceid']
+
+print("<Example of edge reference dataframe row>")
+dict(list(edge_ref_dict.items())[0:2])
+
+# 그래서 ppi 네트워크에 들어간 edge들 중에 KEGG에서 가져온 edge들 있음?
+ind = 0
+for edge in edge_ref_dict:
+    if edge_ref_dict[edge] in kegg_id:
+        ind += 1
+print("The number of KEGG interaction = " + str(ind))
+
+# Because of type difference? Yes!
+
+for i in range(len(kegg_id)):
+    kegg_id[i] = int(kegg_id[i])
+ind = 0
+
+for edge in edge_ref_dict:
+    if edge_ref_dict[edge] in kegg_id:
+        ind += 1
+        
+print("The number of KEGG interaction = " + str(ind))
+
+print("The number of KEGG interaction / Total interaction = " + str(ind) + " / " + str(len(edge_ref_dict)))
+
+# Add edge feature : dataframe 하나하나 읽어서 우선 weight 1로 하고, ref가 KEGG에 있으면, weight에 +1
+
+# 전체 PPI edge들의 weight를 1로 세팅
+nx.set_edge_attributes(ppi_g, 1, "weight")
+
+start = time.time()
+
+# edge들의 reference id가 KEGG에 있다면, 기존 weight에 1을 더한다.
+for edge in edge_ref_dict:
+    if edge_ref_dict[edge] in kegg_id:
+        source = edge[0]
+        target = edge[1]
+        ppi_g[source][target]['weight'] += 1
+        
+print("time :", time.time() - start)
+
+# 실제 KEGG pathway에 reference가 있는 edge들에 weight가 잘 반영되었는지 확인
+
+# reference로 KEGG를 갖는 edge들은 무엇이 있을까?
+kegg_edge = []
+
+for edge in edge_ref_dict:
+    if edge_ref_dict[edge] in kegg_id:
+        kegg_edge.append(edge)
+
+kegg_edge[:10]
+
+for edge in kegg_edge:
+    if ppi_g.get_edge_data(edge[0], edge[1])["weight"] > 2: # more than one reference
+        print(ppi_g.get_edge_data(edge[0], edge[1])["weight"])
+        
+ppi_g.get_edge_data('596', '3708')["weight"]
+
