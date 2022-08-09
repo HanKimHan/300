@@ -1,0 +1,17 @@
+def colored(r, g, b, text): # Highlight the output
+    return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
+
+# CODA reference -> KEGG 찾기
+kegg_id = [] # KEGG reference id
+
+sql_query = "SELECT * FROM reference where name='KEGG';" # first col = refid, third col = KEGG
+cur.execute(sql_query)
+kegg_ref_df = cur.fetchall()
+
+print("Number of KEGG reference id = " + colored(255, 0, 0, str(len(symbol)))) 
+
+for element in kegg_ref_df:
+    kegg_id.append(element[0])
+    
+print("<Examples of the KEGG reference id>")
+print(kegg_id[:10])
