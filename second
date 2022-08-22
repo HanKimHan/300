@@ -81,6 +81,61 @@ for edge in kegg_edge:
         
 ppi_g.get_edge_data('596', '3708')["weight"]
 
+# Weight를 역수로 해서 길이가 짧게 만들기
+for edge in ppi_g.edges():
+    ppi_g[edge[0]][edge[1]]['weight'] = 1/ppi_g[edge[0]][edge[1]]['weight']
+
+# Dijkstra path length
+
+# Drug-gene dictionary
+print(list(drug_gene_dict.items())[:2])
+
+# Disease-gene dictionary
+print(list(disease_gene_dict.items())[:2])
+
+# Parkinson's disease genes
+pd_gene = disease_gene_dict['parkinson disease'] + disease_gene_dict['parkinsonian disorders']
+
+proximity_dict = {}
+
+start = time.time()
+
+for drug in drug_gene_dict.keys():
+    for disease in ['parkinson disease', 'parkinsonian disorders']:
+        multiple_target_distance = []
+        for target_gene in drug_gene_dict[drug]:
+            distance_list = []
+            for disease_gene in disease_gene_dict[disease]:
+                if target_gene in ppi_g.nodes and disease_gene in ppi_g.nodes:
+                    distance_list.append(nx.dijkstra_path_length(ppi_g, target_gene, disease_gene))
+            multiple_target_distance.append(min(distance_list))
+
+        proximity_dict[(drug, disease)] = np.mean(multiple_target_distance) # proximity 평균
+        
+print("time :", time.time() - start)
+proximity_dict
+
+# Shortest path length
+
+SP_proximity_dict = {}
+
+start = time.time()
+
+for drug in drug_gene_dict.keys():
+    for disease in ['parkinson disease', 'parkinsonian disorders']:
+        multiple_target_distance = []
+        for target_gene in drug_gene_dict[drug]:
+            distance_list = []
+            for disease_gene in disease_gene_dict[disease]:
+                if target_gene in ppi_g.nodes and disease_gene in ppi_g.nodes:
+                    distance_list.append(nx.shortest_path_length(ppi_g, target_gene, disease_gene))
+            multiple_target_distance.append(min(distance_list))
+
+        SP_proximity_dict[(drug, disease)] = np.mean(multiple_target_distance) # proximity 평균
+        
+print("time :", time.time() - start)
+SP_proximity_dict
+
 ################################################################################
 !pip install Bio
 
