@@ -89,3 +89,197 @@ from Bio import SeqIO
 seq = SeqIO.read("rcsb_pdb_4D2I.fasta", "fasta")
 print(type(seq))
 print(seq)
+
+import xpdb2
+
+xpdb2
+
+from Bio.PDB import PDBParser
+import xpdb2  # this is the module described below
+
+# read
+sloppyparser = PDBParser(
+    PERMISSIVE=True, structure_builder=xpdb2.SloppyStructureBuilder()
+)
+structure = sloppyparser.get_structure("MD_system", "proteins_441/Q9Y696-MDL-Q9Y696.4-2yv9_A.pdb")
+structure
+
+import pandas as pd
+
+skempi = pd.read_csv('SKEMPI_1.1.csv', delimiter = ';')
+skempi.head()
+
+a = []
+
+for element in skempi['Mutation(s)_PDB']:
+    a.append(element[1])
+
+list(set(a))
+
+# PDC code chain identifier correspond to the second letter of mutation?
+ind = 0
+for i in range(len(skempi)):
+    row = skempi.loc[i]
+    chain = row['Mutation(s)_PDB'][1]
+    PDB_code = row['Protein']
+    PDB_code_split = PDB_code.split('_')
+    if chain == PDB_code_split[1] or chain == PDB_code_split[2]:
+        pass
+    else:
+        ind += 1
+        if ind < 5:
+            print("No! chain is " + chain + " but PDB code is " + PDB_code)
+
+print("\nThe number of inappropriate PPI is " + str(ind))
+print("The number of total PPI is " + str(len(skempi)))
+
+from Bio.PDB import *
+
+pdbl = PDBList() 
+pdbl.retrieve_pdb_file('1CSE', pdir = '.', file_format = 'mmCif')
+
+parser = MMCIFParser(QUIET = True) 
+data = parser.get_structure("1CSE", "1cse.cif")
+data
+
+pdbl = PDBList() 
+pdbl.retrieve_pdb_file('1CSE', pdir = '.', file_format = 'pdb')
+
+parser = PDBParser(PERMISSIVE = True, QUIET = True) 
+data = parser.get_structure("1cse","pdb1cse.ent")
+data
+print(data.header.keys())
+data.header["name"]
+data.header["head"]
+
+model = data.get_models() 
+model
+models = list(model) 
+type(models[0]) 
+chains = list(models[0].get_chains())
+chains 
+type(chains[0]) 
+residue = list(chains[1].get_residues())
+residue
+
+# 1CSE 
+pdbl = PDBList() 
+pdbl.retrieve_pdb_file('1CSE', pdir = '.', file_format = 'pdb')
+
+parser = PDBParser(PERMISSIVE = True, QUIET = True) 
+data = parser.get_structure("1cse","pdb1cse.ent")
+
+model = data.get_models() 
+models = list(model)
+chains = list(models[0].get_chains())
+residue = list(chains[1].get_residues())
+residue
+
+# 1ACB
+pdb2 = PDBList() 
+pdb2.retrieve_pdb_file('1ACB', pdir = '.', file_format = 'pdb')
+
+parser2 = PDBParser(PERMISSIVE = True, QUIET = True) 
+data2 = parser2.get_structure("1acb","pdb1acb.ent")
+
+model2 = data2.get_models() 
+models = list(model2)
+chains = list(models[0].get_chains())
+residue = list(chains[1].get_residues())
+residue
+
+# 1SBN
+pdb3 = PDBList() 
+pdb3.retrieve_pdb_file('1SBN', pdir = '.', file_format = 'pdb')
+
+parser3 = PDBParser(PERMISSIVE = True, QUIET = True) 
+data3 = parser3.get_structure("1sbn","pdb1sbn.ent")
+
+model3 = data3.get_models() 
+models = list(model3)
+chains = list(models[0].get_chains())
+residue = list(chains[1].get_residues())
+residue
+
+# 1TM1
+pdb4 = PDBList() 
+pdb4.retrieve_pdb_file('1TM1', pdir = '.', file_format = 'pdb')
+
+parser4 = PDBParser(PERMISSIVE = True, QUIET = True) 
+data4 = parser4.get_structure("1tm1","pdb1tm1.ent")
+
+model4 = data4.get_models() 
+models = list(model4)
+chains = list(models[0].get_chains())
+residue = list(chains[1].get_residues())
+residue
+
+# 1Y33
+pdb5 = PDBList() 
+pdb5.retrieve_pdb_file('1Y33', pdir = '.', file_format = 'pdb')
+
+parser5 = PDBParser(PERMISSIVE = True, QUIET = True) 
+data5 = parser5.get_structure("1y33","pdb1y33.ent")
+
+model5 = data5.get_models() 
+models = list(model5)
+chains = list(models[0].get_chains())
+residue = list(chains[1].get_residues())
+residue
+
+# convert 3 letters amino acid to 1 letter amino acid
+# dictionary 
+amino_dict = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
+     'ILE': 'I', 'PRO': 'P', 'THR': 'T', 'PHE': 'F', 'ASN': 'N', 
+     'GLY': 'G', 'HIS': 'H', 'LEU': 'L', 'ARG': 'R', 'TRP': 'W', 
+     'ALA': 'A', 'VAL':'V', 'GLU': 'E', 'TYR': 'Y', 'MET': 'M'}
+     
+# PDB residue to sequence
+sequence = ''
+for element in residue:
+    amino = element.get_resname()
+    if amino != 'HOH':
+        sequence += amino_dict[element.get_resname()]
+    else:
+        break
+sequence
+
+# skempi data - sequence
+ind = 0
+for i in range(len(skempi)):
+    row = skempi.loc[i]
+    chain = row['Mutation(s)_PDB'][1]
+    PDB_code = row['Protein']
+    PDB_code_split = PDB_code.split('_')
+    if chain == PDB_code_split[1] or chain == PDB_code_split[2]:
+        pass
+    else:
+        ind += 1
+        if ind < 5:
+            print("No! chain is " + chain + " but PDB code is " + PDB_code)
+            
+skempi2 = pd.read_csv('skempi_v2.csv', delimiter = ';')
+skempi2.head()
+a = []
+
+for element in skempi2['Mutation(s)_PDB']:
+    a.append(element[1])
+
+list(set(a))
+
+# PDC code chain identifier correspond to the second letter of mutation?
+ind = 0
+for i in range(len(skempi2)):
+    row = skempi2.loc[i]
+    chain = row['Mutation(s)_PDB'][1]
+    PDB_code = row['#Pdb']
+    PDB_code_split = PDB_code.split('_')
+    if chain == PDB_code_split[1] or chain == PDB_code_split[2]:
+        pass
+    else:
+        ind += 1
+        if ind < 5:
+            print("No! chain is " + chain + " but PDB code is " + PDB_code)
+
+print("\nThe number of inappropriate PPI is " + str(ind))
+print("The number of total PPI is " + str(len(skempi2)))
