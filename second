@@ -81,3 +81,11 @@ for edge in kegg_edge:
         
 ppi_g.get_edge_data('596', '3708')["weight"]
 
+################################################################################
+!pip install Bio
+
+from Bio import SeqIO
+
+seq = SeqIO.read("rcsb_pdb_4D2I.fasta", "fasta")
+print(type(seq))
+print(seq)
