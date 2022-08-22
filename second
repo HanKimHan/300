@@ -34,6 +34,48 @@ for edge in edge_ref_dict:
         ind += 1
 print("The number of KEGG interaction = " + str(ind))
 
+# 앞서 구한 "Dijkstra path length" vs "Shortest path length"
+# Parkinson's disease + Parkinsonian disease 유전자들 한꺼번에 보자
+print("Disease genes examples : " + str(pd_gene[:5]) + "\n")
+
+proximity_dict_SP = {}
+
+start = time.time()
+
+for drug in drug_gene_dict.keys():
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g.nodes and disease_gene in ppi_g.nodes:
+                distance_list.append(nx.shortest_path_length(ppi_g, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))
+
+    proximity_dict_SP[drug] = np.mean(multiple_target_distance) # proximity 평균
+        
+print("time :", time.time() - start)
+
+# 앞서 구한 "Dijkstra path length" vs "Shortest path length"
+# Parkinson's disease + Parkinsonian disease 유전자들 한꺼번에 보자
+print("Disease genes examples : " + str(pd_gene[:5]) + "\n")
+
+proximity_dict_DJ = {}
+
+start = time.time()
+
+for drug in drug_gene_dict.keys():
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g.nodes and disease_gene in ppi_g.nodes:
+                distance_list.append(nx.dijkstra_path_length(ppi_g, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))
+
+    proximity_dict_DJ[drug] = np.mean(multiple_target_distance) # proximity 평균
+        
+print("time :", time.time() - start)
+
 # Because of type difference? Yes!
 
 for i in range(len(kegg_id)):
