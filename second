@@ -338,3 +338,23 @@ for i in range(len(skempi2)):
 
 print("\nThe number of inappropriate PPI is " + str(ind))
 print("The number of total PPI is " + str(len(skempi2)))
+
+################################################################################
+
+# Confidence로 edge에 weight 준 후 Dijkstra path length 구하기
+# CODA의 evidence score 이용
+# 전부다 manual curation임??
+# What is the type of ppi_df_notna['evidencescore'] keys?
+print("Type of evidence score type : " + str(type(ppi_df_notna['evidencescore'][200].keys())))
+
+evidence_type = []
+for evidence in ppi_df_notna['evidencescore']:
+    if evidence != None: # No Nonetype
+        if str(evidence.keys()) == "dict_keys(['Manual_Curation'])":
+            pass
+        else: #만약 evidence score가 Manual Curation이 아니라면?
+            #print(str(evidence.keys())) # "Discrete level이었고, 엄청 많다.
+            evidence_type.append(str(evidence.keys()))
+print("\n")
+print(list(set(evidence_type)))
+print("\nOnly Discrete level & Manual curation!")
