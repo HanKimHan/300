@@ -1,0 +1,154 @@
+# 앞서 구한 "Dijkstra path length" vs "Shortest path length"
+# Parkinson's disease + Parkinsonian disease 유전자들 한꺼번에 보자
+print("Disease genes examples : " + str(pd_gene[:5]) + "\n")
+
+proximity_dict_SP = {}
+
+start = time.time()
+
+for drug in drug_gene_dict.keys():
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g.nodes and disease_gene in ppi_g.nodes:
+                distance_list.append(nx.shortest_path_length(ppi_g, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))
+
+    proximity_dict_SP[drug] = np.mean(multiple_target_distance) # proximity 평균
+        
+print("time :", time.time() - start)
+
+# 앞서 구한 "Dijkstra path length" vs "Shortest path length"
+# Parkinson's disease + Parkinsonian disease 유전자들 한꺼번에 보자
+print("Disease genes examples : " + str(pd_gene[:5]) + "\n")
+
+proximity_dict_DJ = {}
+
+start = time.time()
+
+for drug in drug_gene_dict.keys():
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g.nodes and disease_gene in ppi_g.nodes:
+                distance_list.append(nx.dijkstra_path_length(ppi_g, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))
+
+    proximity_dict_DJ[drug] = np.mean(multiple_target_distance) # proximity 평균
+        
+print("time :", time.time() - start)
+
+######### Dijkstra path method #########
+# Dictionary to dataframe
+# 0. Parkinson's disease 치료에 쓰이는 drug 찾기
+pd_drug = []
+for element in drug_disease_pair:
+    if element[1] in ['parkinson disease', 'parkinsonian disorders']:
+        pd_drug.append(element[0])
+        
+# 1. Drug / Non-drug
+label = []
+ind = 0 # drug label이 잘 들어갔는지 확인
+for drug in proximity_dict_DJ.keys():
+    if drug in pd_drug:
+        label.append("Drug")
+        ind += 1
+    else:
+        label.append("Non-drug")
+        
+if ind == len(pd_drug):
+    print("Good Job!")
+else:
+    print("PD drug in dictionary is " + str(ind) + " but actual pd drug is " + str(len(pd_drug)))
+    
+# 2. proximity list
+distance = list(proximity_dict_DJ.values())
+
+# 3. dictionary
+for_boxplot = {}
+for_boxplot['distance'] = distance
+for_boxplot['label'] = label
+
+# To dataframe
+df = pd.DataFrame(for_boxplot)
+
+######### Shortest path method #########
+# 1. Drug / Non-drug
+label_SP = []
+ind_SP = 0 # drug label이 잘 들어갔는지 확인
+for drug in proximity_dict_SP.keys():
+    if drug in pd_drug:
+        label_SP.append("Drug")
+        ind_SP += 1
+    else:
+        label_SP.append("Non-drug")
+        
+if ind_SP == len(pd_drug):
+    print("Good Job!")
+else:
+    print("PD drug in dictionary is " + str(ind_SP) + " but actual pd drug is " + str(len(pd_drug)))
+    
+# 2. proximity list
+distance_SP = list(proximity_dict_SP.values())
+
+# 3. dictionary
+for_boxplot_SP = {}
+for_boxplot_SP['distance'] = distance_SP
+for_boxplot_SP['label'] = label_SP
+
+# To dataframe
+df_SP = pd.DataFrame(for_boxplot_SP)
+
+# 일단 sns 들어간 코드 가져오기
+import seaborn as sns
+import matplotlib.pyplot as plt
+#from statannot import add_stat_annotation
+fig, axes = plt.subplots(1, 2)
+######### Shortest path method #########
+x2 = "label"
+y2 = "distance"
+order2 = ['Drug', 'Non-drug']
+sns.boxplot(data=df_SP, x=x2, y=y2, order=order2, ax=axes[0])
+
+######### Dijkstra path method #########
+x = "label"
+y = "distance"
+order = ['Drug', 'Non-drug']
+sns.boxplot(data=df, x=x, y=y, order=order, ax=axes[1])
+
+'''
+ax, test_results = add_stat_annotation(ax, data=df, x=x, y=y, order=order,
+                                   box_pairs=[("Drug", "Non-drug")],
+                                   test='Mann-Whitney', text_format='star', loc='outside', verbose=2)
+'''
+sns.despine() # 필요없는 axis border 제거
+axes[0].set_title("Shortest")
+axes[1].set_title("Dijkstra")
+
+# Drug vs Non-drug p-value 구하기
+import scipy.stats
+
+######### Shortest path method #########
+drug_SP = []
+non_drug_SP = []
+for drug in proximity_dict_SP.keys():
+    if drug in pd_drug:
+        drug_SP.append(proximity_dict_SP[drug])
+    else:
+        non_drug_SP.append(proximity_dict_SP[drug])
+p_value_SP = scipy.stats.ttest_ind(drug_SP, non_drug_SP, equal_var=False)
+print(p_value_SP)
+
+######### Dijkstra path method #########
+drug_DJ = []
+non_drug_DJ = []
+for drug in proximity_dict_DJ.keys():
+    if drug in pd_drug:
+        drug_DJ.append(proximity_dict_DJ[drug])
+    else:
+        non_drug_DJ.append(proximity_dict_DJ[drug])
+p_value_DJ = scipy.stats.ttest_ind(drug_DJ, non_drug_DJ, equal_var=False)
+print(p_value_DJ)
+#scipy.stats.ttest_ind(avg_prox, avg_prox_false, equal_var=False)
