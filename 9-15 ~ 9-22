@@ -150,3 +150,52 @@ gsm_exp_dict = {} # expression data for each sample ex) 'GSM508708' : [8.11, 9.1
 for gsm_name, gsm in gse.gsms.items():
     print("Name: ", gsm_name)
     gsm_exp_dict[gsm_name] = list(gsm.table[gsm.table['ID_REF'].isin(lead2gene.keys())]['VALUE'])
+
+gsm_exp_dict = {} # expression data for each sample ex) 'GSM508708' : [8.11, 9.15, ...]
+gsm_exp_dict['Name'] = list(gsm.table[gsm.table['ID_REF'].isin(lead2gene.keys())]['ID_REF'])
+
+for gsm_name, gsm in gse.gsms.items():
+    print("Name: ", gsm_name)
+    gsm_exp_dict[gsm_name] = list(gsm.table[gsm.table['ID_REF'].isin(lead2gene.keys())]['VALUE'])
+
+################# INPUT 1 #################
+gene_exp = pd.DataFrame(gsm_exp_dict) # GSEA의 input으로 들어감
+
+gpl.table[gpl.table['ID']=='1053_at']
+gpl.table[gpl.table['ID']=='203696_s_at']
+
+def gene2lead(entrez_id_list): # Input : '5982' --> Output : '1053_at'
+    lead_list = []
+    
+    for entrez_id in entrez_id_list:
+        for lead in lead2gene.keys():
+            if entrez_id in lead2gene[lead]:
+                lead_list.append(lead)
+    
+    return list(set(lead_list)) # 내부의 중복 제거
+
+lead2gene.values()
+
+for lead in lead2gene.keys():
+    if '5982' in lead2gene[lead]:
+        print(lead)
+        
+gene2lead(['780', '100616237', '6202', '26811', '94163'])
+
+################# INPUT 2 #################
+
+hsa_lead_dict = {}
+for hsa in hsa_gene_dict:
+    hsa_lead_dict[hsa] = gene2lead(hsa_gene_dict[hsa])
+    
+# ex) 'hsa04210', 'hsa05163', 'hsa05131'
+hsa_lead_dict['hsa04210']
+
+gsm.metadata['characteristics_ch1'][0]
+
+################# INPUT 3 #################
+cls = []
+
+for gsm_name, gsm in gse.gsms.items():
+    state = gsm.metadata['characteristics_ch1'][0].split(': ')
+    cls.append(state[1])
