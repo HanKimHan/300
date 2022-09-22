@@ -1,0 +1,146 @@
+sql_query = "SELECT * FROM reference where name='KEGG';" # first col = refid, third col = KEGG
+cur.execute(sql_query)
+kegg_list = cur.fetchall()
+
+# KEGG pathway 다시 만들어보자
+## {(103, 4798) : (hsa01293, hsa0111) , ...} 이런 식의 dictionary 만들기
+kegg_df = pd.DataFrame(kegg_list, columns = ['refid', 'reftype', 'name', 'description', 
+                                             'recordid', 'version', 'sourcedata', 'acqdate', 
+                                             'regdata', 'expi', 'subexpi', 'procpi', 'subprocpi'])
+
+## refid와 recordid를 dictionary로 만들기
+ref_record = {}
+for i in range(len(kegg_df)):
+    row = kegg_df.loc[i]
+    pathway_list_raw = row['recordid'].split('|')
+    pathway_list = []
+    for element in pathway_list_raw:
+        pathway_list.append(element.split('+')[1])
+    ref_record[row['refid']] = pathway_list
+
+# List of edges that exist in kegg pathway
+# Dataframe that contains edges with entrez id is "ppi_df_notna"
+
+# Add edge feature : dataframe 하나하나 읽어서 우선 weight 1로 하고, ref가 KEGG에 있으면, weight에 +1
+
+# 전체 PPI edge들의 weight를 1로 세팅
+nx.set_edge_attributes(ppi_g, 1, "weight")
+
+start = time.time()
+
+# edge들의 reference id가 KEGG에 있다면, 기존 weight에 1을 더한다.
+for edge in edge_ref_dict:
+    if edge_ref_dict[edge] in kegg_id:
+        source = edge[0]
+        target = edge[1]
+        ppi_g[source][target]['weight'] += len(ref_record[edge_ref_dict[edge]])
+        
+print("time :", time.time() - start)
+
+# hsa list 
+hsa_list = [] # ex) ['hsa04010', 'hsa04014', 'hsa04010' ...]
+
+for ref in ref_record:
+    hsa_list += ref_record[ref] # ex) ['hsa04010'] + ['hsa04014', 'hsa04010']
+    
+hsa_list = list(set(hsa_list)) # pathway들의 중복 제거
+
+# hsa & ref dictionary
+hsa_ref_dict = {} # ex) {"hsa04010" : [50319, 20, ..] ...}
+
+for ref in ref_record:
+    for hsa in ref_record[ref]:
+        if hsa in hsa_ref_dict.keys():
+            hsa_ref_dict[hsa].append(ref)
+        else:
+            hsa_ref_dict[hsa] = [ref]
+
+# 각 values가 list 형식인데, list 내부 요소가 중복되지 않도록
+for hsa in hsa_ref_dict.keys():
+    hsa_ref_dict[hsa] = list(set(hsa_ref_dict[hsa]))
+    
+# ref & edge dictionary
+ref_edge_dict = {} # ex) {50890: ('5443', 4988'), ...}
+
+for edge in edge_ref_dict.keys():
+    ref_edge_dict[edge_ref_dict[edge]] = edge
+    
+# hsa & gene dictionary
+hsa_gene_dict = {} # ex) {"hsa04010": (5443, 4988, 496, ...), "hsa04011": (232, 4844, ...), ...}
+
+for hsa in hsa_ref_dict.keys(): # ex) "hsa04010"
+    gene_list = [] # gene_list = [5443, 4988, 496, ...]
+    
+    for ref in hsa_ref_dict[hsa]: # ex) 50211, 50212, ... 
+        # ex) ('4214', '22800')
+        if ref in ref_edge_dict.keys(): # hsa에 있는 reference가 ref_edge_dict에는 없을 수 있다.
+            gene_list.append(ref_edge_dict[ref][0]) # ex) append '4212'
+            gene_list.append(ref_edge_dict[ref][1]) # ex) append '22800'
+        else:
+            pass
+    
+    gene_list = list(set(gene_list)) # No duplication
+    
+    hsa_gene_dict[hsa] = gene_list # 각 pathway에 관여하는 유전자들이 추가된다.
+    
+print("Total number of hsa pathway is %d" %len(hsa_gene_dict.keys()))
+
+from Bio.Affy import CelFile
+# GSE20292 - GSM508708
+
+with open('expression/GSM508708.CEL', 'rb') as handle:
+    c = CelFile.read(handle, version=4)
+
+#print(c.rows, c.cols)
+print(c.intensities)
+
+!pip install GEOparse
+
+import GEOparse
+gse = GEOparse.get_GEO(geo="GSE20292", destdir="./")
+
+print()
+print("GSM example:")
+for gsm_name, gsm in gse.gsms.items():
+    print("Name: ", gsm_name)
+    print("Metadata:",)
+    for key, value in gsm.metadata.items():
+        print(" - %s : %s" % (key, ", ".join(value)))
+    print ("Table data:",)
+    print (gsm.table.head())
+    break
+
+print()
+print("GPL example:")
+for gpl_name, gpl in gse.gpls.items():
+    print("Name: ", gpl_name)
+    print("Metadata:",)
+    for key, value in gpl.metadata.items():
+        print(" - %s : %s" % (key, ", ".join(value)))
+    print("Table data:",)
+    print(gpl.table.head())
+    break
+    
+# ID - Entrez gene id dictionary ex) '1007_s_at': ['780', '100616237']
+lead2gene = {}
+for i in range(len(gpl.table)):
+    row = gpl.table.loc[i]
+    lead_id = row[0]
+    gene_id_raw = row[11] # ex) '780 /// 100616237'
+    
+    try:
+        gene_id_list = gene_id_raw.split(' /// ')
+    except:
+        pass
+    
+    for gene in gene_id_list:
+        if gene in ppi_g.nodes():
+            if lead_id in lead2gene.keys():
+                lead2gene[lead_id].append(gene)
+            else:
+                lead2gene[lead_id] = [gene]
+                
+# gsm table에서 nan이 제거된 gene id만 읽기
+print("Number of genes without NaN value in symbol is %d" %len(lead2gene.keys()) + '/22283')
+
+gsm.table[gsm.table['ID_REF'].isin(lead2gene.keys())]
