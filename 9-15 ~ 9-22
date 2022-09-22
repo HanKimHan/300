@@ -144,3 +144,9 @@ for i in range(len(gpl.table)):
 print("Number of genes without NaN value in symbol is %d" %len(lead2gene.keys()) + '/22283')
 
 gsm.table[gsm.table['ID_REF'].isin(lead2gene.keys())]
+
+gsm_exp_dict = {} # expression data for each sample ex) 'GSM508708' : [8.11, 9.15, ...]
+
+for gsm_name, gsm in gse.gsms.items():
+    print("Name: ", gsm_name)
+    gsm_exp_dict[gsm_name] = list(gsm.table[gsm.table['ID_REF'].isin(lead2gene.keys())]['VALUE'])
