@@ -31,10 +31,25 @@ gs_res.res2d[:20]
 
 gs_res.res2d['Lead_genes'][0].split(';') # Lead genes에는 12/27이면 12개만 들어가 있다.
 
+# Amoebiasis - 왜 NES가 높은거임? (어떤 유전자가 관여하길래?)
+for lead in gs_res.res2d['Lead_genes'][7].split(';'):
+    print(get_gene_name(lead2gene[lead][0]))
+    
+# Parkinson's disease에 연관된 pathway의 NES는?
+gs_res.res2d[gs_res.res2d['Term'] == 'hsa04728']
+
 # NES 분포
 import seaborn as sns
 
 sns.distplot(abs(gs_res.res2d['NES']))
+plt.axvline(1.111568, 0, 2, color='g', linestyle='--', linewidth=0.5)
+
+plt.axvline(1.348922, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(1.302724, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04210 - Apoptosis
+plt.axvline(0.57801, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04141 - Protein processing in endoplasmic reticulum
+plt.axvline(0.712135, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04020 - Calcium signaling pathway
+
+plt.legend(['NES distribution','Parkinsons disease', 'PD related pathways'])
 
 from gseapy import gseaplot, heatmap
 terms = gs_res.res2d.Term
@@ -47,3 +62,532 @@ genes = gs_res.res2d.Lead_genes[i].split(";")
 # Make sure that ``ofname`` is not None, if you want to save your figure to disk
 heatmap(df = gs_res.heatmat.loc[genes], z_score=0, title=terms[i], figsize=(14,4), cmap=plt.cm.RdBu_r)
 
+# GSM606624, GSM606625, GSM606626 좀 이상하다
+# 얘네를 빼고 진행해보자
+gse2 = GEOparse.get_GEO(geo="GSE20292", destdir="./")
+
+print()
+print("GSM example:")
+for gsm_name2, gsm2 in gse2.gsms.items():
+    print("Name: ", gsm_name2)
+    print("Metadata:",)
+    for key, value in gsm2.metadata.items():
+        print(" - %s : %s" % (key, ", ".join(value)))
+    print ("Table data:",)
+    print (gsm2.table.head())
+    break
+
+print()
+print("GPL example:")
+for gpl_name2, gpl2 in gse2.gpls.items():
+    print("Name: ", gpl_name2)
+    print("Metadata:",)
+    for key, value in gpl2.metadata.items():
+        print(" - %s : %s" % (key, ", ".join(value)))
+    print("Table data:",)
+    print(gpl2.table.head())
+    break
+    
+gsm_exp_dict2 = {} # expression data for each sample ex) 'GSM508708' : [8.11, 9.15, ...]
+gsm_exp_dict2['Name'] = list(gsm2.table[gsm2.table['ID_REF'].isin(lead2gene.keys())]['ID_REF'])
+
+for gsm_name2, gsm2 in gse2.gsms.items():
+    gsm_exp_dict2[gsm_name2] = list(gsm2.table[gsm2.table['ID_REF'].isin(lead2gene.keys())]['VALUE'])
+    
+################# INPUT 1 #################
+gene_exp2 = pd.DataFrame(gsm_exp_dict2) # GSEA의 input으로 들어감
+gene_exp2 = gene_exp2.drop(columns=['GSM606624', 'GSM606625', 'GSM606626'])
+gene_exp2
+
+gene_exp_norm2 = gene_exp2.drop(['Name'], axis=1)
+gene_exp_norm2 = (gene_exp_norm2 - gene_exp_norm2.mean())/gene_exp_norm2.std()
+
+gene_exp_norm2.insert(0, 'Name', gene_exp2['Name'])
+gene_exp_norm2
+
+################# INPUT 2 is same #################
+
+################# INPUT 3 #################
+label2 = []
+
+for gsm_name2, gsm2 in gse2.gsms.items():
+    if gsm2.metadata['geo_accession'][0] not in ['GSM606624', 'GSM606625', 'GSM606626']:
+        state = gsm2.metadata['characteristics_ch1'][0].split(': ')
+        label2.append(state[1])
+        
+len(label2)
+
+start = time.time()
+
+gs_res2 = gp.gsea(data=gene_exp_norm2, 
+                 gene_sets=hsa_lead_dict, 
+                 cls= label2, 
+                 # set permutation_type to phenotype if samples >=15
+                 permutation_type='phenotype',
+                 permutation_num=500, # reduce number to speed up test
+                 outdir=None,  # do not write output to disk
+                 method='signal_to_noise',
+                 threads=4, seed= 7)
+
+print("time :", time.time() - start)
+
+gs_res2.res2d[:20]
+
+# Parkinson's disease에 연관된 pathway의 NES는?
+gs_res2.res2d[gs_res2.res2d['Term'] == 'hsa04670']
+
+# NES 분포
+import seaborn as sns
+
+sns.distplot(abs(gs_res2.res2d['NES']))
+plt.axvline(0.958097, 0, 2, color='g', linestyle='--', linewidth=0.5)
+
+plt.axvline(1.251415, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(1.275778, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04210 - Apoptosis
+plt.axvline(0.941062, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04141 - Protein processing in endoplasmic reticulum
+plt.axvline(0.852667, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04020 - Calcium signaling pathway
+
+plt.legend(['NES distribution','Parkinsons disease', 'PD related pathways'])
+
+terms = gs_res2.res2d.Term
+i = 10
+# Make sure that ``ofname`` is not None, if you want to save your figure to disk
+gseaplot(gs_res2.ranking, term=terms[i], **gs_res2.results[terms[i]])
+
+# plotting heatmap
+genes = gs_res2.res2d.Lead_genes[i].split(";")
+# Make sure that ``ofname`` is not None, if you want to save your figure to disk
+heatmap(df = gs_res2.heatmat.loc[genes], z_score=0, title=terms[i], figsize=(14,4), cmap=plt.cm.RdBu_r)
+
+# NES 역수의 분포를 pathway 개수를 바탕으로 한 네트워크의 edge weight의 분포와 같게 만들자
+# Pathway 개수를 바탕으로 한 네트워크의 edge weight 분포
+
+edge_weight = nx.get_edge_attributes(ppi_g, 'weight').values()
+
+sns.distplot(list(edge_weight))
+
+# 대부분 1이라 의미가 없는 것 같다.
+# 단순히 abs(NES)의 역수로 해도 괜찮을 것 같다.
+
+# edge에 해당하는 hsa list가 필요하다.
+# 현재 있는 data: edge-ref (ref_edge_dict) ex) {50890: ('5443', '4988'), 59817: ('3458', '6778'), 50415: ('2885', '2549'), ...}
+# ref-hsa (ref_record) ex) {50211: ['hsa04010'], 50212: ['hsa04014', 'hsa04010'], ...}
+
+# edge NES dictionary
+edge_nes_dict = {} # ex) {('5443', '4988') : 0.77, ('3458', '6778') : 0.8912, ...}
+
+for edge in ref_edge_dict.values():
+    ref = list(ref_edge_dict.keys())[list(ref_edge_dict.values()).index(edge)]
+    if ref in ref_record.keys():
+        hsa_list = ref_record[ref] # ex) ['hsa04014', 'hsa04010', 'hsa05200']
+
+        nes_list = [] # ex) [1.329, 0.392, ...]
+        
+        for hsa in hsa_list: # dataframe : gs_res2.res2d
+            if hsa in list(gs_res2.res2d['Term']):
+                nes_list.append(abs(gs_res2.res2d[gs_res2.res2d['Term'] == hsa]['NES'].item()))
+        
+        nes_avg = np.mean(nes_list)
+        
+        if np.isnan(nes_avg):
+            nes_avg = 1
+        
+        edge_nes_dict[edge] = nes_avg
+        
+ref_record
+
+# ppi network에 edge weight 반영
+
+# Add edge feature : dataframe 하나하나 읽어서 우선 weight 1로 하고, edge에 NES 값이 존재하면 반영 
+
+# 전체 PPI edge들의 weight를 1로 세팅
+nx.set_edge_attributes(ppi_g, 1, "weight")
+
+start = time.time()
+
+# edge들의 reference id가 KEGG에 있다면, 기존 weight에 1을 더한다.
+for edge in edge_nes_dict.keys():
+    source = edge[0]
+    target = edge[1]
+    ppi_g[source][target]['weight'] = edge_nes_dict[edge]
+        
+print("time :", time.time() - start)
+
+# Weight를 역수로 해서 길이가 짧게 만들기
+for edge in ppi_g.edges():
+    ppi_g[edge[0]][edge[1]]['weight'] = 1/ppi_g[edge[0]][edge[1]]['weight']
+    
+# 앞서 구한 "Dijkstra path length" vs "Shortest path length"
+# Parkinson's disease + Parkinsonian disease 유전자들 한꺼번에 보자
+
+proximity_dict_SP_GSEA = {}
+
+start = time.time()
+
+for drug in drug_gene_dict.keys():
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g.nodes and disease_gene in ppi_g.nodes:
+                distance_list.append(nx.shortest_path_length(ppi_g, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))
+
+    proximity_dict_SP_GSEA[drug] = np.mean(multiple_target_distance) # proximity 평균
+        
+print("time :", time.time() - start)
+
+# 앞서 구한 "Dijkstra path length" vs "Shortest path length"
+# Parkinson's disease + Parkinsonian disease 유전자들 한꺼번에 보자
+
+proximity_dict_DJ_GSEA = {}
+
+start = time.time()
+
+for drug in drug_gene_dict.keys():
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g.nodes and disease_gene in ppi_g.nodes:
+                distance_list.append(nx.dijkstra_path_length(ppi_g, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))
+
+    proximity_dict_DJ_GSEA[drug] = np.mean(multiple_target_distance) # proximity 평균
+        
+print("time :", time.time() - start)
+
+######### Dijkstra path method #########
+# Dictionary to dataframe
+# 0. Parkinson's disease 치료에 쓰이는 drug 찾기
+pd_drug = []
+for element in drug_disease_pair:
+    if element[1] in ['parkinson disease', 'parkinsonian disorders']:
+        pd_drug.append(element[0])
+        
+# 1. Drug / Non-drug
+label = []
+ind = 0 # drug label이 잘 들어갔는지 확인
+for drug in proximity_dict_DJ_GSEA.keys():
+    if drug in pd_drug:
+        label.append("Drug")
+        ind += 1
+    else:
+        label.append("Non-drug")
+        
+if ind == len(pd_drug):
+    print("Good Job!")
+else:
+    print("PD drug in dictionary is " + str(ind) + " but actual pd drug is " + str(len(pd_drug)))
+    
+# 2. proximity list
+distance = list(proximity_dict_DJ_GSEA.values())
+
+# 3. dictionary
+for_boxplot = {}
+for_boxplot['distance'] = distance
+for_boxplot['label'] = label
+
+# To dataframe
+df = pd.DataFrame(for_boxplot)
+
+######### Shortest path method #########
+# 1. Drug / Non-drug
+label_SP = []
+ind_SP = 0 # drug label이 잘 들어갔는지 확인
+for drug in proximity_dict_SP_GSEA.keys():
+    if drug in pd_drug:
+        label_SP.append("Drug")
+        ind_SP += 1
+    else:
+        label_SP.append("Non-drug")
+        
+if ind_SP == len(pd_drug):
+    print("Good Job!")
+else:
+    print("PD drug in dictionary is " + str(ind_SP) + " but actual pd drug is " + str(len(pd_drug)))
+    
+# 2. proximity list
+distance_SP = list(proximity_dict_SP_GSEA.values())
+
+# 3. dictionary
+for_boxplot_SP = {}
+for_boxplot_SP['distance'] = distance_SP
+for_boxplot_SP['label'] = label_SP
+
+# To dataframe
+df_SP = pd.DataFrame(for_boxplot_SP)
+
+# 일단 sns 들어간 코드 가져오기
+import seaborn as sns
+import matplotlib.pyplot as plt
+#from statannot import add_stat_annotation
+fig, axes = plt.subplots(1, 2)
+######### Shortest path method #########
+x2 = "label"
+y2 = "distance"
+order2 = ['Drug', 'Non-drug']
+sns.boxplot(data=df_SP, x=x2, y=y2, order=order2, ax=axes[0])
+
+######### Dijkstra path method #########
+x = "label"
+y = "distance"
+order = ['Drug', 'Non-drug']
+sns.boxplot(data=df, x=x, y=y, order=order, ax=axes[1])
+
+'''
+ax, test_results = add_stat_annotation(ax, data=df, x=x, y=y, order=order,
+                                   box_pairs=[("Drug", "Non-drug")],
+                                   test='Mann-Whitney', text_format='star', loc='outside', verbose=2)
+'''
+sns.despine() # 필요없는 axis border 제거
+axes[0].set_title("Shortest")
+axes[1].set_title("Dijkstra")
+
+# Drug vs Non-drug p-value 구하기
+import scipy.stats
+
+######### Shortest path method #########
+drug_SP = []
+non_drug_SP = []
+for drug in proximity_dict_SP_GSEA.keys():
+    if drug in pd_drug:
+        drug_SP.append(proximity_dict_SP_GSEA[drug])
+    else:
+        non_drug_SP.append(proximity_dict_SP_GSEA[drug])
+p_value_SP = scipy.stats.ttest_ind(drug_SP, non_drug_SP, equal_var=False)
+print(p_value_SP)
+
+######### Dijkstra path method #########
+drug_DJ = []
+non_drug_DJ = []
+for drug in proximity_dict_DJ_GSEA.keys():
+    if drug in pd_drug:
+        drug_DJ.append(proximity_dict_DJ_GSEA[drug])
+    else:
+        non_drug_DJ.append(proximity_dict_DJ_GSEA[drug])
+p_value_DJ = scipy.stats.ttest_ind(drug_DJ, non_drug_DJ, equal_var=False)
+print(p_value_DJ)
+#scipy.stats.ttest_ind(avg_prox, avg_prox_false, equal_var=False)
+
+ppi_g_final = ppi_g
+
+# Considering pathway number & scoring together
+
+# Add edge feature : dataframe 하나하나 읽어서 우선 weight 1로 하고, ref가 KEGG에 있으면, weight에 + NES
+
+# 전체 PPI edge들의 weight를 1로 세팅
+nx.set_edge_attributes(ppi_g_final, 1, "weight")
+
+start = time.time()
+
+# edge들의 reference id가 KEGG에 있다면, 기존 weight에 해당 pathway의 NES를 더한다.
+for edge in edge_ref_dict:
+    ref = edge_ref_dict[edge] # ex) 50890
+    nes = 0
+    
+    if ref in ref_record.keys():
+        hsa_list = ref_record[ref] # ex) ['hsa04014', 'hsa04010', 'hsa05200']
+        
+        for hsa in hsa_list:
+            if hsa in list(gs_res2.res2d['Term']):
+                nes += abs(gs_res2.res2d[gs_res2.res2d['Term'] == hsa]['NES'].item()) # 해당 edge의 모든 NES 값을 더한다.
+        
+    source = edge[0]
+    target = edge[1]
+    ppi_g_final[source][target]['weight'] += nes # hsa 개수가 아니라 모든 hsa의 NES가 더해진 값
+        
+print("time :", time.time() - start)
+
+# Weight를 역수로 해서 길이가 짧게 만들기
+for edge in ppi_g_final.edges():
+    ppi_g_final[edge[0]][edge[1]]['weight'] = 1/ppi_g_final[edge[0]][edge[1]]['weight']
+    
+# weight가 1 이상인 edge들의 분포 (1이 대부분이므로 분포 파악 어려움)
+filtered_weight = list(filter(lambda x: x < 1, list(nx.get_edge_attributes(ppi_g_final, 'weight').values())))
+
+sns.distplot(filtered_weight)
+
+# weight가 1 이상인 edge들의 분포 (1이 대부분이므로 분포 파악 어려움)
+filtered_weight_2 = list(filter(lambda x: x < 1, list(nx.get_edge_attributes(ppi_g, 'weight').values())))
+
+sns.distplot(filtered_weight_2)
+
+# 앞서 구한 "Dijkstra path length" vs "Shortest path length"
+# Parkinson's disease + Parkinsonian disease 유전자들 한꺼번에 보자
+
+proximity_dict_SP_final = {}
+
+start = time.time()
+
+for drug in drug_gene_dict.keys():
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                distance_list.append(nx.shortest_path_length(ppi_g_final, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))
+
+    proximity_dict_SP_final[drug] = np.mean(multiple_target_distance) # proximity 평균
+        
+print("time :", time.time() - start)
+
+# 앞서 구한 "Dijkstra path length" vs "Shortest path length"
+# Parkinson's disease + Parkinsonian disease 유전자들 한꺼번에 보자
+
+proximity_dict_DJ_final = {}
+
+start = time.time()
+
+for drug in drug_gene_dict.keys():
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                distance_list.append(nx.dijkstra_path_length(ppi_g_final, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))
+
+    proximity_dict_DJ_final[drug] = np.mean(multiple_target_distance) # proximity 평균
+        
+print("time :", time.time() - start)
+
+######### Dijkstra path method #########
+# Dictionary to dataframe
+# 0. Parkinson's disease 치료에 쓰이는 drug 찾기
+pd_drug = []
+for element in drug_disease_pair:
+    if element[1] in ['parkinson disease', 'parkinsonian disorders']:
+        pd_drug.append(element[0])
+        
+# 1. Drug / Non-drug
+label = []
+ind = 0 # drug label이 잘 들어갔는지 확인
+for drug in proximity_dict_DJ_final.keys():
+    if drug in pd_drug:
+        label.append("Drug")
+        ind += 1
+    else:
+        label.append("Non-drug")
+        
+if ind == len(pd_drug):
+    print("Good Job!")
+else:
+    print("PD drug in dictionary is " + str(ind) + " but actual pd drug is " + str(len(pd_drug)))
+    
+# 2. proximity list
+distance = list(proximity_dict_DJ_final.values())
+
+# 3. dictionary
+for_boxplot = {}
+for_boxplot['distance'] = distance
+for_boxplot['label'] = label
+
+# To dataframe
+df = pd.DataFrame(for_boxplot)
+
+######### Shortest path method #########
+# 1. Drug / Non-drug
+label_SP = []
+ind_SP = 0 # drug label이 잘 들어갔는지 확인
+for drug in proximity_dict_SP_final.keys():
+    if drug in pd_drug:
+        label_SP.append("Drug")
+        ind_SP += 1
+    else:
+        label_SP.append("Non-drug")
+        
+if ind_SP == len(pd_drug):
+    print("Good Job!")
+else:
+    print("PD drug in dictionary is " + str(ind_SP) + " but actual pd drug is " + str(len(pd_drug)))
+    
+# 2. proximity list
+distance_SP = list(proximity_dict_SP_final.values())
+
+# 3. dictionary
+for_boxplot_SP = {}
+for_boxplot_SP['distance'] = distance_SP
+for_boxplot_SP['label'] = label_SP
+
+# To dataframe
+df_SP = pd.DataFrame(for_boxplot_SP)
+
+# 일단 sns 들어간 코드 가져오기
+import seaborn as sns
+import matplotlib.pyplot as plt
+#from statannot import add_stat_annotation
+fig, axes = plt.subplots(1, 2)
+######### Shortest path method #########
+x2 = "label"
+y2 = "distance"
+order2 = ['Drug', 'Non-drug']
+sns.boxplot(data=df_SP, x=x2, y=y2, order=order2, ax=axes[0])
+
+######### Dijkstra path method #########
+x = "label"
+y = "distance"
+order = ['Drug', 'Non-drug']
+sns.boxplot(data=df, x=x, y=y, order=order, ax=axes[1])
+
+'''
+ax, test_results = add_stat_annotation(ax, data=df, x=x, y=y, order=order,
+                                   box_pairs=[("Drug", "Non-drug")],
+                                   test='Mann-Whitney', text_format='star', loc='outside', verbose=2)
+'''
+sns.despine() # 필요없는 axis border 제거
+axes[0].set_title("Shortest")
+axes[1].set_title("Dijkstra")
+
+# Drug vs Non-drug p-value 구하기
+import scipy.stats
+
+######### Shortest path method #########
+drug_SP = []
+non_drug_SP = []
+for drug in proximity_dict_SP_final.keys():
+    if drug in pd_drug:
+        drug_SP.append(proximity_dict_SP_final[drug])
+    else:
+        non_drug_SP.append(proximity_dict_SP_final[drug])
+p_value_SP = scipy.stats.ttest_ind(drug_SP, non_drug_SP, equal_var=False)
+print(p_value_SP)
+
+######### Dijkstra path method #########
+drug_DJ = []
+non_drug_DJ = []
+for drug in proximity_dict_DJ_final.keys():
+    if drug in pd_drug:
+        drug_DJ.append(proximity_dict_DJ_final[drug])
+    else:
+        non_drug_DJ.append(proximity_dict_DJ_final[drug])
+p_value_DJ = scipy.stats.ttest_ind(drug_DJ, non_drug_DJ, equal_var=False)
+print(p_value_DJ)
+#scipy.stats.ttest_ind(avg_prox, avg_prox_false, equal_var=False)
+
+sorted_proximity_dict_DJ_final = sorted(proximity_dict_DJ_final.items(), key = lambda item: item[1])
+
+sorted_proximity_dict_SP_final = sorted(proximity_dict_SP_final.items(), key = lambda item: item[1])
+
+import csv
+
+# write TSV files
+with open('proximity_SP_final.tsv', 'w', encoding='utf-8', newline='') as f:
+    tw = csv.writer(f, delimiter='\t')
+    tw.writerow(['Drug', 'Proximity', 'label'])
+    for element in sorted_proximity_dict_SP_final:
+        if element[0] in pd_drug:
+            tw.writerow([element[0], element[1], 1])
+        else:
+            tw.writerow([element[0], element[1], 0])
+            
+with open('proximity_DJ_final.tsv', 'w', encoding='utf-8', newline='') as f:
+    tw = csv.writer(f, delimiter='\t')
+    tw.writerow(['Drug', 'Proximity', 'label'])
+    for element in sorted_proximity_dict_DJ_final:
+        if element[0] in pd_drug:
+            tw.writerow([element[0], element[1], 1])
+        else:
+            tw.writerow([element[0], element[1], 0])
+            
