@@ -1,3 +1,4 @@
+####################################################### 개인연구 #######################################################
 for gsm_name, gsm in gse20291.gsms.items():
     state = gsm.metadata['characteristics_ch1'][0].split(': ')[1] # Control or Parkinson's disease
     if state == 'Control':
@@ -282,3 +283,23 @@ print("time :", time.time() - start)
 print(multiple_target_distance)
 print(dijkstra_path_list)
 
+####################################################### Kaggle #######################################################
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+import sys
+print(sys.version)
+
+import numpy, pandas, seaborn, matplotlib, sklearn, missingno, lightgbm, xgboost
+
+import pandas as pd
+
+submission = pd.read_csv('/kaggle/input/titanic/gender_submission.csv')
+submission
+
+submission.to_csv('submission.csv', index=False)
