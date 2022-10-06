@@ -1,0 +1,284 @@
+for gsm_name, gsm in gse20291.gsms.items():
+    state = gsm.metadata['characteristics_ch1'][0].split(': ')[1] # Control or Parkinson's disease
+    if state == 'Control':
+        ctrl_ind += 1
+    else:
+        pd_ind += 1
+
+print('Number of control is %d' %ctrl_ind)
+print('Number of patient is %d' %pd_ind)
+
+import GEOparse
+gse20168 = GEOparse.get_GEO(geo="GSE20168", destdir="./")
+
+print()
+print("GSM example:")
+for gsm_name, gsm in gse20168.gsms.items():
+    print("Name: ", gsm_name)
+    print("Metadata:",)
+    for key, value in gsm.metadata.items():
+        print(" - %s : %s" % (key, ", ".join(value)))
+    print ("Table data:",)
+    print (gsm.table.head())
+    break
+
+print()
+print("GPL example:")
+for gpl_name, gpl in gse20168.gpls.items():
+    print("Name: ", gpl_name)
+    print("Metadata:",)
+    for key, value in gpl.metadata.items():
+        print(" - %s : %s" % (key, ", ".join(value)))
+    print("Table data:",)
+    print(gpl.table.head())
+    break
+    
+ctrl_ind = 0 # number of control
+pd_ind = 0 # number of patients
+
+for gsm_name, gsm in gse20168.gsms.items():
+    state = gsm.metadata['characteristics_ch1'][0].split(': ')[1] # Control or Parkinson's disease
+    if state == 'control':
+        ctrl_ind += 1
+    else:
+        pd_ind += 1
+
+print('Number of control is %d' %ctrl_ind)
+print('Number of patient is %d' %pd_ind)
+
+gene_exp_gse20292 = gene_exp2
+
+gsm_exp_dict_gse20291 = {} # expression data for each sample ex) 'GSM508708' : [8.11, 9.15, ...]
+gsm_exp_dict_gse20291['Name'] = list(gsm.table[gsm.table['ID_REF'].isin(lead2gene.keys())]['ID_REF'])
+
+for gsm_name, gsm in gse20291.gsms.items():
+    gsm_exp_dict_gse20291[gsm_name] = list(gsm.table[gsm.table['ID_REF'].isin(lead2gene.keys())]['VALUE'])
+    
+gene_exp_gse20291 = pd.DataFrame(gsm_exp_dict_gse20291) # GSEA의 input으로 들어감
+
+gsm_exp_dict_gse20168 = {} # expression data for each sample ex) 'GSM508708' : [8.11, 9.15, ...]
+gsm_exp_dict_gse20168['Name'] = list(gsm.table[gsm.table['ID_REF'].isin(lead2gene.keys())]['ID_REF'])
+
+for gsm_name, gsm in gse20168.gsms.items():
+    gsm_exp_dict_gse20168[gsm_name] = list(gsm.table[gsm.table['ID_REF'].isin(lead2gene.keys())]['VALUE'])
+    
+gene_exp_gse20168 = pd.DataFrame(gsm_exp_dict_gse20168) # GSEA의 input으로 들어감
+
+# gene_exp_gse20292, gene_exp_gse20291, gene_exp_gse20168
+if sum(gene_exp_gse20168['Name'] != gene_exp_gse20291['Name']) == 0:
+    print('gse20291 and gse20168 have same leads!')
+
+if sum(gene_exp_gse20292['Name'] != gene_exp_gse20291['Name']) == 0:
+    print('gse20292 and gse20291 have same leads!')
+    
+# First, drop 'Name' column with gse20291 & GSE20168
+gene_exp_gse20291 = gene_exp_gse20291.drop(['Name'], axis=1)
+gene_exp_gse20168 = gene_exp_gse20168.drop(['Name'], axis=1)
+
+gene_exp_concat = pd.concat([gene_exp_gse20292, gene_exp_gse20291, gene_exp_gse20168], axis=1)
+gene_exp_concat
+
+gene_exp_concat_norm = gene_exp_concat.drop(['Name'], axis=1)
+gene_exp_concat_norm = (gene_exp_concat_norm - gene_exp_concat_norm.mean())/gene_exp_concat_norm.std()
+
+gene_exp_concat_norm.insert(0, 'Name', gene_exp_concat['Name'])
+gene_exp_concat_norm
+
+################# INPUT 2 is same #################
+
+label_gse20292 = {}
+
+for gsm_name, gsm in gse2.gsms.items():
+    if gsm.metadata['geo_accession'][0] not in ['GSM606624', 'GSM606625', 'GSM606626']:
+        state = gsm.metadata['characteristics_ch1'][0].split(': ')
+        label_gse20292[gsm.metadata['geo_accession'][0]] = state[1]
+        
+label_gse20291 = {}
+
+for gsm_name, gsm in gse20291.gsms.items():
+    if gsm.metadata['geo_accession'][0] not in ['GSM606619', 'GSM606621', 'GSM606623']:
+        state = gsm.metadata['characteristics_ch1'][0].split(': ')
+        label_gse20291[gsm.metadata['geo_accession'][0]] = state[1]
+        
+label_gse20168 = {}
+
+for gsm_name, gsm in gse20168.gsms.items():
+    state = gsm.metadata['characteristics_ch1'][0].split(': ')
+    label_gse20168[gsm.metadata['geo_accession'][0]] = state[1]
+    
+################# INPUT 3 #################
+label_final = []
+
+for sample in list(gene_exp_concat_norm.keys())[1:]:
+    if sample in label_gse20292.keys():
+        label_final.append(label_gse20292[sample].lower())
+    elif sample in label_gse20291.keys():
+        label_final.append(label_gse20291[sample].lower())
+    else:
+        label_final.append(label_gse20168[sample].lower())
+        
+# parkinson's disease --> parkinsons disease
+for i in range(len(label_final)):
+    if label_final[i] == "parkinson's disease":
+        label_final[i] = 'parkinsons disease'
+        
+start = time.time()
+
+gs_res_final = gp.gsea(data=gene_exp_concat_norm, 
+                 gene_sets=hsa_lead_dict, 
+                 cls= label_final, 
+                 # set permutation_type to phenotype if samples >=15
+                 permutation_type='phenotype',
+                 permutation_num=500, # reduce number to speed up test
+                 outdir=None,  # do not write output to disk
+                 method='signal_to_noise',
+                 threads=4, seed= 7)
+
+print("time :", time.time() - start)
+
+gs_res_final.res2d
+
+# Parkinson's disease에 연관된 pathway의 NES는?
+gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa05012']
+
+# NES 분포
+import seaborn as sns
+
+sns.distplot(abs(gs_res_final.res2d['NES']))
+plt.axvline(0.978118, 0, 2, color='g', linestyle='--', linewidth=0.5)
+
+plt.axvline(1.205066, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(1.631299, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04210 - Apoptosis
+plt.axvline(0.940356, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04141 - Protein processing in endoplasmic reticulum
+plt.axvline(0.978467, 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04020 - Calcium signaling pathway
+
+plt.legend(['NES distribution','Parkinsons disease', 'PD related pathways'])
+
+terms = gs_res_final.res2d.Term
+i = 3
+# Make sure that ``ofname`` is not None, if you want to save your figure to disk
+gseaplot(gs_res_final.ranking, term=terms[i], **gs_res_final.results[terms[i]])
+
+# plotting heatmap
+genes = gs_res_final.res2d.Lead_genes[i].split(";")
+# Make sure that ``ofname`` is not None, if you want to save your figure to disk
+heatmap(df = gs_res_final.heatmat.loc[genes], z_score=0, title=terms[i], figsize=(14,4), cmap=plt.cm.RdBu_r)
+
+# Number of pathways is too small?
+# Number of pathways used in Hypothesis 1 vs Hypothesis 2
+
+# Hypothesis 1
+edge_ref_dict
+
+# Hypothesis 2
+print("Number of pathways used in GSEA is %d"%len(gs_res_final.res2d))
+
+# Hypothesis 1
+#edge_ref_dict.values()
+pathway_list = []
+
+for pathway in ref_record.values():
+    pathway_list += pathway
+    
+len(set(pathway_list))
+
+# 파킨슨 병 치료에 쓰이는 약물들의 proximity 변화 확인
+######### Shortest path method #########
+pd_drug_SP = {}
+for drug in proximity_dict_SP_final.keys():
+    if drug in pd_drug:
+        pd_drug_SP[drug] = proximity_dict_SP_final[drug] # ex) {'DB00494' : 0.5, 'DB00396' : ...}
+
+######### Dijkstra path method #########
+pd_drug_DJ = {}
+for drug in proximity_dict_DJ_final.keys():
+    if drug in pd_drug:
+        pd_drug_DJ[drug] = proximity_dict_DJ_final[drug] # ex) {'DB00494' : 0.5, 'DB00396' : ...}
+        
+# 각 약물의 길이 변화를 눈으로 확인
+x = np.arange(0,3)
+y = x
+
+plt.plot(x, y, c = 'gray', linestyle = '--')
+plt.scatter(pd_drug_SP.values(), pd_drug_DJ.values())
+plt.xlabel('Shortest path')
+plt.ylabel('Dijkstra path')
+
+# 가장 변화가 심한 약물 빨간색으로 칠하고 약물 이름 체크
+distance_difference = {} # {'DB00396' : 0.34, ...}
+for drug in pd_drug_SP:
+    distance_difference[drug] = pd_drug_SP[drug] - pd_drug_DJ[drug]
+distance_difference = {k: v for k, v in sorted(distance_difference.items(), key=lambda item: item[1], reverse=True)}
+
+# Top 3 drug
+top3 = list(distance_difference.keys())[:3]
+
+# color difference ex) red, red, blue, blue, blue, ...
+color = []
+label = []
+for drug in pd_drug_SP:
+    if drug in top3:
+        color.append('r')
+        label.append(drug)
+    else:
+        color.append('b')
+        label.append('')
+        
+fig, ax = plt.subplots()
+ax.plot(x, y, c = 'gray', linestyle = '--')
+ax.scatter(pd_drug_SP.values(), pd_drug_DJ.values(), color=color)
+
+for i, txt in enumerate(label):
+    ax.annotate(txt, (list(pd_drug_SP.values())[i], list(pd_drug_DJ.values())[i]), fontsize=10)
+
+plt.xlabel('Shortest path')
+plt.ylabel('Dijkstra path')
+
+for drug in distance_difference.keys():
+    print(len(drug_gene_dict[drug]))
+    
+shortest_path = {}
+
+for drug in ['DB00376']:
+    shortest_path_list = []
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                distance_list.append(nx.shortest_path_length(ppi_g_final, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))  
+        
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                if nx.shortest_path_length(ppi_g_final, target_gene, disease_gene) == min(distance_list):
+                    shortest_path[target_gene] = [p for p in nx.all_shortest_paths(ppi_g_final, target_gene, disease_gene)]
+                    
+shortest_path
+
+start = time.time()
+
+for drug in ['DB00376']:
+    dijkstra_path_list = {}
+    dijkstra_distance_list = {}
+    
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                distance = nx.dijkstra_path_length(ppi_g_final, target_gene, disease_gene)
+                dijkstra_distance_list[(target_gene, disease_gene)] = distance
+                distance_list.append(distance)
+                
+                path = nx.dijkstra_path(ppi_g_final, target_gene, disease_gene)
+                dijkstra_path_list[(target_gene, disease_gene)] = path
+                
+        multiple_target_distance.append(min(distance_list))  
+
+print("time :", time.time() - start)
+
+print(multiple_target_distance)
+print(dijkstra_path_list)
+
