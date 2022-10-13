@@ -1,1 +1,105 @@
-d
+# DB00245
+
+shortest_path = {}
+
+for drug in ['DB00245']:
+    shortest_path_list = []
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                distance_list.append(nx.shortest_path_length(ppi_g_final, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))  
+        
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                if nx.shortest_path_length(ppi_g_final, target_gene, disease_gene) == min(distance_list):
+                    shortest_path[target_gene] = [p for p in nx.all_shortest_paths(ppi_g_final, target_gene, disease_gene)]
+                    
+shortest_path
+
+start = time.time()
+
+for drug in ['DB00245']:
+    dijkstra_path_list = {}
+    dijkstra_distance_list = {}
+    
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                distance = nx.dijkstra_path_length(ppi_g_final, target_gene, disease_gene)
+                dijkstra_distance_list[(target_gene, disease_gene)] = distance
+                distance_list.append(distance)
+                
+                path = nx.dijkstra_path(ppi_g_final, target_gene, disease_gene)
+                dijkstra_path_list[(target_gene, disease_gene)] = path
+                
+        multiple_target_distance.append(min(distance_list))  
+
+print("time :", time.time() - start)
+
+print(multiple_target_distance)
+print(dijkstra_path_list)
+
+dijkstra_distance_list
+
+nx.dijkstra_path_length(ppi_g_final, '3269', '2776')
+
+ref_record[edge_ref_dict[('3269', '2776')]]
+
+# DB01200
+
+shortest_path = {}
+
+for drug in ['DB01200']:
+    shortest_path_list = []
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                distance_list.append(nx.shortest_path_length(ppi_g_final, target_gene, disease_gene))
+        multiple_target_distance.append(min(distance_list))  
+        
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                if nx.shortest_path_length(ppi_g_final, target_gene, disease_gene) == min(distance_list):
+                    shortest_path[target_gene] = [p for p in nx.all_shortest_paths(ppi_g_final, target_gene, disease_gene)]
+                    
+shortest_path
+
+start = time.time()
+
+for drug in ['DB01200']:
+    dijkstra_path_list = {}
+    dijkstra_distance_list = {}
+    
+    multiple_target_distance = []
+    for target_gene in drug_gene_dict[drug]:
+        distance_list = []
+        for disease_gene in pd_gene:
+            if target_gene in ppi_g_final.nodes and disease_gene in ppi_g_final.nodes:
+                distance = nx.dijkstra_path_length(ppi_g_final, target_gene, disease_gene)
+                dijkstra_distance_list[(target_gene, disease_gene)] = distance
+                distance_list.append(distance)
+                
+                path = nx.dijkstra_path(ppi_g_final, target_gene, disease_gene)
+                dijkstra_path_list[(target_gene, disease_gene)] = path
+                
+        multiple_target_distance.append(min(distance_list))  
+
+print("time :", time.time() - start)
+
+print(multiple_target_distance)
+print(dijkstra_path_list)
+
+dijkstra_distance_list
+
+nx.dijkstra_path_length(ppi_g_final, '1006', '6667')
+
+ref_record[edge_ref_dict[('148', '2776')]]
