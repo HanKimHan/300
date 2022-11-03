@@ -1,0 +1,485 @@
+sql_query = "select * from knowledgeunit where  level = '0' and referenceid in (SELECT refid from reference where name ='KEGG') and lefttype='GP' and righttype='GP';"
+cur.execute(sql_query)
+kegg_list_modified = cur.fetchall()
+
+# 광민이형 추천 방법으로 얻은 전체 KEGG list
+
+kegg_df_modified = pd.DataFrame(kegg_list_modified, columns=['kuid', 'lefttype', 'leftentityid', 'leftorganid', 'lefttissueid',
+                                                             'leftcellid', 'association', 'righttype', 'rightentityid', 
+                                                             'rightorganid', 'righttissueid', 'rightcellid','associationcontext',
+                                                             'associationinsource', 'speciesid', 'referenceid', 'evidencescore',
+                                                             'level'])
+kegg_df_modified
+
+# CODA 형식으로 저장된 유전자를 Entrez id로 변환
+
+GP_list = list(set(kegg_df_modified['leftentityid'].to_list())) + list(set(kegg_df_modified['rightentityid'].to_list()))
+GP_list = list(set(GP_list))
+
+# Gene symbol to Entrez id
+symbol_list = GP2symbol(GP_list)
+zip_iterator = zip(GP_list, symbol_list)
+gp_symbol_dict = dict(zip_iterator)
+
+kegg_df_modified['leftentityid'] = kegg_df_modified['leftentityid'].apply(lambda x: get_gene_id(gp_symbol_dict[x]))
+kegg_df_modified['rightentityid'] = kegg_df_modified['rightentityid'].apply(lambda x: get_gene_id(gp_symbol_dict[x]))
+
+kegg_df_modified
+
+# 그 중 None 값이 아닌 row만 추출 (Protein complex가 아닌 row)
+
+kegg_df_modified_notna = kegg_df_modified[(kegg_df_modified['leftentityid'].notna()) & (kegg_df_modified['rightentityid'].notna())] # ppi dataframe with no NaN
+
+kegg_df_modified_notna = kegg_df_modified_notna.reset_index(drop=True) # index reset
+
+kegg_df_modified_notna
+
+print("Total number of edge in PPI network : %d"%len(ppi_g.edges()))
+print("Total number of KEGG edge in PPI network : %d"%len(kegg_df_modified_notna))
+
+ratio = [533214-51841, 51841]
+labels = ['Not KEGG', 'KEGG']
+
+plt.pie(ratio, labels=labels, autopct='%.1f%%')
+plt.show()
+
+kegg_ref_edge_dict
+
+kegg_ref_edge_dict = {}
+for i in range(len(kegg_df_modified_notna)):
+    row = kegg_df_modified_notna.iloc[i]
+    left = row['leftentityid']
+    if left == None:
+        print(row)
+        break
+    right = row['rightentityid']
+    reference = row['referenceid']
+    if (left, right) not in kegg_df_modified_notna.keys():
+        kegg_ref_edge_dict[(left, right)] = [reference]
+    else:
+        kegg_ref_edge_dict[(left, right)].append(reference)
+        
+for element in kegg_ref_edge_dict.keys():
+    if element[0] == None:
+        print(element)
+        
+ppi_g_hypo1 = ppi_g
+
+ind = 0
+for edge in kegg_ref_edge_dict.keys():
+    if len(kegg_ref_edge_dict[edge])>1:
+        ind += 1
+print(str(ind)+" / "+str(len(kegg_ref_edge_dict)))
+
+kegg_ref_edge_dict
+
+# Edge 중 self loop 지우기
+
+ppi_g_hypo1.remove_edges_from(nx.selfloop_edges(ppi_g_hypo1))
+
+nx.set_edge_attributes(ppi_g_hypo1, 1, "weight")
+
+start = time.time()
+
+# edge들의 reference id가 KEGG에 있다면, 기존 weight에 1을 더한다.
+for edge in kegg_ref_edge_dict:
+    source = edge[0]
+    target = edge[1]
+    ref_list = kegg_ref_edge_dict[edge]
+    
+    if source != target:
+        hsa_list = []
+
+        for ref in ref_list:
+            hsa_list += ref_record[ref]
+        try:
+            ppi_g_hypo1[source][target]['weight'] += len(hsa_list)
+        except:
+            print(source)
+            print(target)
+        
+print("time :", time.time() - start)
+
+for edge in kegg_ref_edge_dict:
+    if ppi_g_hypo1.get_edge_data(edge[0], edge[1])["weight"] > 3: # more than one reference
+        print(ppi_g_hypo1.get_edge_data(edge[0], edge[1])["weight"])
+        
+# Weight를 역수로 해서 길이가 짧게 만들기
+for edge in ppi_g_hypo1.edges():
+    ppi_g_hypo1[edge[0]][edge[1]]['weight'] = 1/ppi_g_hypo1[edge[0]][edge[1]]['weight']
+    
+# edge weight distribution 확인
+
+edge_weight_1 = nx.get_edge_attributes(ppi_g_hypo1, 'weight').values()
+edge_weight_without_1 = list(filter(lambda x: x != 1, edge_weight_1))
+
+sns.displot(edge_weight_without_1)
+
+print("Number of edges with large weights is %d"%len(edge_weight_without_1))
+num = len(edge_weight_1) - len(edge_weight_without_1)
+print("Number of edges with no weight is %d"%num)
+
+# 새로운 KEGG data를 받아 네트워크를 구축했다.
+
+# 따라서 새로운 pathway & gene list가 필요하다.
+
+# new hsa & gene list dictionary
+edge_hsa_dict = {} # ex) {"hsa04010": (5443, 4988, 496, ...), "hsa04011": (232, 4844, ...), ...}
+
+# 우선, edge & hsa dictionary를 만든다.
+for edge in kegg_ref_edge_dict.keys(): # ex) ('55970', '5922'), ('2768', '5922') ...
+    hsa_list = []
+    for ref in kegg_ref_edge_dict[edge]: # ex) 50211, 50212, ... 
+        if ref in ref_record.keys():
+            hsa_list += ref_record[ref]
+        else:
+            pass
+    
+    hsa_list = list(set(hsa_list)) # No duplication
+    
+    edge_hsa_dict[edge] = hsa_list # edge가 어떤 pathway들에 관여하는지 알 수 있다.
+
+edge_hsa_dict
+
+# 실제로 edge가 해당 pathway에 관여하는지 확인
+# ex) ('55970', '5922'): ['hsa04010'], ('2768', '5922'): ['hsa04010']
+# 확인 완료
+
+total_hsa = []
+for value in edge_hsa_dict.values():
+    total_hsa += value
+total_hsa = list(set(total_hsa))
+len(total_hsa)
+
+# 전체 pathway 수 307개와 맞지 않다..
+# edge에 들어간 reference 수가 맞지 않을 수도 있다.
+
+ref_list_test = []
+for ref in kegg_ref_edge_dict.values():
+    ref_list_test += ref
+ref_list_test = list(set(ref_list_test))
+print(len(ref_list_test))
+
+print(len(ref_record.keys()))
+
+# 하나의 hsa에 어떤 edge들이 관여할까?
+hsa_edge_dict = {} # hsa04010 : [('55970', '5922'), ('2768', '5922') ...]
+for hsa in total_hsa:
+    edge_list = [k for k, v in edge_hsa_dict.items() if hsa in v] 
+    hsa_edge_dict[hsa] = edge_list
+    
+# 하나의 hsa에 관여하는 edge들을 유전자 집합화
+hsa_gene_dict_modified = {}
+for hsa in hsa_edge_dict.keys():
+    gene_list = []
+    for edge in hsa_edge_dict[hsa]:
+        gene_list.append(edge[0])
+        gene_list.append(edge[1])
+    gene_list = list(set(gene_list))
+    hsa_gene_dict_modified[hsa] = gene_list
+hsa_gene_dict_modified
+
+# NES 분포
+import seaborn as sns
+
+sns.distplot(abs(gs_res.res2d['NES']))
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa05012']['NES'].values[0]), 0, 2, color='g', linestyle='--', linewidth=0.5)
+
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04020']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04020 - Calcium signaling pathway
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04137']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04141']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04210']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04728']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04140']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04068']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa00010']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04010']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04064']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04150']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04152']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa05208']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04151']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res.res2d[gs_res.res2d['Term'] == 'hsa04310']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+
+plt.legend(['NES distribution','Parkinsons disease', 'PD related pathways'])
+
+# New version
+
+# edge NES dictionary
+edge_nes_dict = {} # ex) {('5443', '4988') : 0.77, ('3458', '6778') : 0.8912, ...}
+
+ind = 0
+num_edge_gsea = 0
+
+for edge in edge_hsa_dict.keys():
+    ind += 1
+    hsa_list = edge_hsa_dict[edge] # ex) ['hsa04014', 'hsa04010', 'hsa05200']
+    nes_list = [] # ex) [1.329, 0.392, ...]
+
+    for hsa in hsa_list:
+        if hsa in list(gs_res2.res2d['Term']): # dataframe : gs_res2.res2d
+            nes_list.append(abs(gs_res2.res2d[gs_res2.res2d['Term'] == hsa]['NES'].item()))
+
+    if len(nes_list) == 0:
+        nes_sum = 1
+    else:
+        nes_sum = sum(nes_list)
+        num_edge_gsea += 1
+
+    edge_nes_dict[edge] = nes_sum
+    
+print("Total number of edges in PPI network : %d"%len(ppi_g_gsea.edges()))
+print("Total number of edges that have scores : %d"%ind)
+
+# Total number of pathways
+hsa_list = []
+for hsa in list(ref_record.values()):
+    hsa_list += hsa
+hsa_list = list(set(hsa_list))
+print("Total number of pathways : %d"%len(hsa_list))
+
+# Total number of edge with KEGG pathways
+
+# Total number of pathways that undergo GSEA
+gsea_df = gs_res2.res2d
+print("Total number of pathways that undergo GSEA : %d"%len(gs_res2.res2d))
+
+# Total number of pathways that undergo GSEA
+print("Total number of edges that undergo GSEA : %d"%num_edge_gsea)
+
+ratio = [530709, 34746]
+labels = ['No score', 'Score']
+
+plt.pie(ratio, labels=labels, autopct='%.1f%%')
+plt.show()
+
+# ppi network에 edge weight 반영
+
+# Add edge feature : dataframe 하나하나 읽어서 우선 weight 1로 하고, edge에 NES 값이 존재하면 반영 
+
+# 전체 PPI edge들의 weight를 1로 세팅
+nx.set_edge_attributes(ppi_g_hypo2, 1, "weight")
+
+start = time.time()
+
+# edge들의 reference id가 KEGG에 있다면, 기존 weight에 NES sum을 더한다.
+for edge in edge_nes_dict.keys():
+    source = edge[0]
+    target = edge[1]
+    try:
+        if source != target:
+            ppi_g_hypo2[source][target]['weight'] += edge_nes_dict[edge]
+    except:
+        print((source, target))
+        
+print("time :", time.time() - start)
+
+edge_weight_GSEA = list(nx.get_edge_attributes(ppi_g_hypo2, 'weight').values())
+
+sns.distplot(edge_weight_GSEA)
+
+# 대부분 1.0이므로 1을 제외하고 분포가 어떤지 확인
+print("Total number of edge is %d"%len(list(edge_weight_GSEA)))
+edge_weight_GSEA_filtered = list(filter(lambda x: x!=1.0, edge_weight_GSEA))
+print("Number of weighted edge is %d"%len(edge_weight_GSEA_filtered))
+
+sns.displot(edge_weight_GSEA_filtered)
+
+# Weight를 역수로 해서 길이가 짧게 만들기
+start = time.time()
+for edge in ppi_g_hypo2.edges():
+    ppi_g_hypo2[edge[0]][edge[1]]['weight'] = 1/ppi_g_hypo2[edge[0]][edge[1]]['weight']
+print("time :", time.time() - start)
+
+# 대부분 1.0이므로 1을 제외하고 분포가 어떤지 확인
+edge_weight_GSEA_filtered_2 = list(filter(lambda x: x!=1.0, list(nx.get_edge_attributes(ppi_g_hypo2, 'weight').values())))
+sns.displot(edge_weight_GSEA_filtered_2)
+
+# 파킨슨 병 치료에 쓰이지 않는 약물들의 proximity 변화 확인
+######### Shortest path method #########
+non_pd_drug_SP = {}
+for drug in proximity_dict_SP_final.keys():
+    if drug not in pd_drug:
+        non_pd_drug_SP[drug] = proximity_dict_SP_final[drug] # ex) {'DB00494' : 0.5, 'DB00396' : ...}
+
+######### Dijkstra path method #########
+non_pd_drug_DJ = {}
+for drug in proximity_dict_DJ_final.keys():
+    if drug not in pd_drug:
+        non_pd_drug_DJ[drug] = proximity_dict_DJ_final[drug] # ex) {'DB00494' : 0.5, 'DB00396' : ...}
+        
+# 가장 변화가 심한 약물 빨간색으로 칠하고 약물 이름 체크
+distance_difference_2 = {} # {'DB00396' : 0.34, ...}
+for drug in non_pd_drug_SP:
+    distance_difference_2[drug] = non_pd_drug_SP[drug] - non_pd_drug_DJ[drug]
+distance_difference_2 = {k: v for k, v in sorted(distance_difference_2.items(), key=lambda item: item[1], reverse=True)}
+
+# Top 3 drug
+top10_2 = list(distance_difference_2.keys())[:10]
+
+# color difference ex) red, red, blue, blue, blue, ...
+color = []
+label = []
+for drug in non_pd_drug_SP:
+    if drug in top10_2:
+        color.append('orange')
+        label.append(drug)
+    else:
+        color.append('skyblue')
+        label.append('')
+        
+fig, ax = plt.subplots()
+ax.plot(x, y, c = 'gray', linestyle = '--')
+ax.scatter(non_pd_drug_SP.values(), non_pd_drug_DJ.values(), color=color)
+
+for i, txt in enumerate(label):
+    ax.annotate(txt, (list(non_pd_drug_SP.values())[i], list(non_pd_drug_DJ.values())[i]), fontsize=3)
+
+plt.xlabel('Shortest path')
+plt.ylabel('Dijkstra path')
+
+top10_3 = [k for k, v in sorted(proximity_dict_DJ_final.items(), key=lambda item: item[1], reverse=False)][:10]
+
+top10_3
+
+# color difference ex) red, red, blue, blue, blue, ...
+color = []
+label = []
+for drug in non_pd_drug_SP:
+    if drug in top10_3:
+        color.append('orange')
+        label.append(drug)
+    else:
+        color.append('skyblue')
+        label.append('')
+        
+fig, ax = plt.subplots()
+ax.plot(x, y, c = 'gray', linestyle = '--')
+ax.scatter(non_pd_drug_SP.values(), non_pd_drug_DJ.values(), color=color)
+
+for i, txt in enumerate(label):
+    ax.annotate(txt, (list(non_pd_drug_SP.values())[i], list(non_pd_drug_DJ.values())[i]), fontsize=5)
+
+plt.xlabel('Shortest path')
+plt.ylabel('Dijkstra path')
+
+element_0 = '5331'
+element_1 = '5071'
+    
+try:
+    print(edge_hsa_dict[(element_0, element_1)])
+except:
+    try:
+        print(edge_hsa_dict[(element_1, element_0)])
+    except:
+        print('error')
+        
+index_SP_final = []
+ind_SP_final = 1
+label_SP_final = []
+proximity_SP_final = []
+
+for element in sorted_proximity_dict_SP_final:
+    index_SP_final.append(ind_SP_final)
+    ind_SP_final += 1
+    
+    label_SP_final.append(str(int(element[1][1])))
+    
+    proximity_SP_final.append(1-element[1][0])
+    
+proximity_SP_final
+
+data_final = pd.DataFrame({'index' : index_SP_final, 'label' : label_SP_final, 
+                           'probability' : proximity_SP_final})
+                           
+Precision_final, Recall_final = PR(data_final)
+
+Recall_final
+
+AUPRC_Precision_final = [0] + Precision_final
+AUPRC_Recall_final = [0] + Recall_final
+
+AUPRC_final = 0
+for i in range(1, len(AUPRC_Precision_final)):
+    tmp_AUPRC = (AUPRC_Precision_final[i - 1] + AUPRC_Precision_final[i]) * (AUPRC_Recall_final[i] - AUPRC_Recall_final[i - 1]) / 2
+    AUPRC_final += tmp_AUPRC
+    
+fig = plt.figure()
+fig.set_size_inches(15, 15)
+plt.plot(Recall_final, Precision_final)
+plt.fill_between(Recall_final, Precision_final, 0, facecolor="red", alpha=0.2)
+plt.xlabel("Recall", fontsize = 24)
+plt.ylabel("Precision", fontsize = 24)
+
+# AUPRC 필기
+plt.text(Recall_final[-1]/2, Precision_final[-1]/2, 'AUPRC : ' + str(AUPRC_final), fontsize = 24)
+
+index_DJ_final = []
+ind_DJ_final = 1
+label_DJ_final = []
+proximity_DJ_final = []
+
+for element in sorted_proximity_dict_DJ_final:
+    index_DJ_final.append(ind_DJ_final)
+    ind_DJ_final += 1
+    
+    label_DJ_final.append(str(int(element[1][1])))
+    
+    proximity_DJ_final.append(1-element[1][0])
+    
+data_DJ_final = pd.DataFrame({'index' : index_DJ_final, 'label' : label_DJ_final, 
+                              'probability' : proximity_DJ_final})
+                              
+Precision_DJ_final, Recall_DJ_final = PR(data_DJ_final)
+
+Recall_DJ_final
+
+AUPRC_Precision_DJ_final = [0] + Precision_DJ_final
+AUPRC_Recall_DJ_final = [0] + Recall_DJ_final
+
+AUPRC_DJ_final = 0
+for i in range(1, len(AUPRC_Precision_DJ_final)):
+    tmp_AUPRC = (AUPRC_Precision_DJ_final[i - 1] + AUPRC_Precision_DJ_final[i]) * (AUPRC_Recall_DJ_final[i] - AUPRC_Recall_DJ_final[i - 1]) / 2
+    AUPRC_DJ_final += tmp_AUPRC
+    
+fig = plt.figure()
+fig.set_size_inches(15, 15)
+plt.plot(Recall_DJ_final, Precision_DJ_final)
+plt.fill_between(Recall_DJ_final, Precision_DJ_final, 0, facecolor="red", alpha=0.2)
+plt.xlabel("Recall", fontsize = 24)
+plt.ylabel("Precision", fontsize = 24)
+
+# AUPRC 필기
+plt.text(Recall_DJ_final[-1]/2, Precision_DJ_final[-1]/2, 'AUPRC : ' + str(AUPRC_DJ_final), fontsize = 24)
+
+x = ["Previous work", "MY research"]
+y = [round(Recall_final[49], 4), round(Recall_DJ_final[49], 4)]
+
+plt.bar(x,y,color=['skyblue', 'orange'],edgecolor='black')
+plt.ylim([0,1])
+plt.title("Recall with Top 50 drugs")
+
+for i, v in enumerate(x):
+    plt.text(v, y[i], y[i],                 # 좌표 (x축 = v, y축 = y[0]..y[1], 표시 = y[0]..y[1])
+             fontsize = 15, 
+             color='black',
+             horizontalalignment='center',  # horizontalalignment (left, center, right)
+             verticalalignment='bottom')    # verticalalignment (top, center, bottom)
+
+plt.show()
+
+x = ["Previous work", "Hypothesis 1", "Hypothesis 1 & 2"]
+y = [round(Recall_final[49], 4), round(Recall_DJ[49], 4), round(Recall_DJ_final[49], 4)]
+
+plt.bar(x,y,color=['skyblue', 'gold', 'orange'],edgecolor='black')
+plt.ylim([0,1])
+plt.title("Recall with Top 50 drugs")
+
+for i, v in enumerate(x):
+    plt.text(v, y[i], y[i],                 # 좌표 (x축 = v, y축 = y[0]..y[1], 표시 = y[0]..y[1])
+             fontsize = 15, 
+             color='black',
+             horizontalalignment='center',  # horizontalalignment (left, center, right)
+             verticalalignment='bottom')    # verticalalignment (top, center, bottom)
+
+plt.show()
