@@ -629,3 +629,13 @@ for drug in proximity_dict_DJ_final.keys():
 p_value_DJ = scipy.stats.ttest_ind(drug_DJ, non_drug_DJ,alternative='less', equal_var=True)
 print(p_value_DJ)
 #scipy.stats.ttest_ind(avg_prox, avg_prox_false, equal_var=False)
+
+x = []
+ind = 0
+
+for i in range(len(Precision_DJ_final)):
+    x.append(ind)
+    ind += 1
+
+plt.plot(x, Precision_DJ_final, color='black')
+plt.title("Recall change")
