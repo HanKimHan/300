@@ -593,3 +593,39 @@ labels = ['Random pathway', 'PD pathway']
 plt.pie(ratio, labels=labels, autopct='%.1f%%')
 plt.show()
 
+# Drug vs Non-drug p-value 구하기
+import scipy.stats
+
+######### Shortest path method #########
+drug_SP = []
+non_drug_SP = []
+for drug in proximity_dict_SP_final.keys():
+    if drug in pd_drug:
+        drug_SP.append(proximity_dict_SP_final[drug])
+    else:
+        non_drug_SP.append(proximity_dict_SP_final[drug])
+p_value_SP = scipy.stats.ttest_ind(drug_SP, non_drug_SP, alternative='less', equal_var=True)
+print(p_value_SP)
+
+######### Dijkstra path method #########
+drug_DJ_0 = []
+non_drug_DJ_0 = []
+for drug in proximity_dict_DJ.keys():
+    if drug in pd_drug:
+        drug_DJ_0.append(proximity_dict_DJ[drug])
+    else:
+        non_drug_DJ_0.append(proximity_dict_DJ[drug])
+p_value_DJ_0 = scipy.stats.ttest_ind(drug_DJ_0, non_drug_DJ_0, alternative='less', equal_var=True)
+print(p_value_DJ_0)
+
+######### Dijkstra path method #########
+drug_DJ = []
+non_drug_DJ = []
+for drug in proximity_dict_DJ_final.keys():
+    if drug in pd_drug:
+        drug_DJ.append(proximity_dict_DJ_final[drug])
+    else:
+        non_drug_DJ.append(proximity_dict_DJ_final[drug])
+p_value_DJ = scipy.stats.ttest_ind(drug_DJ, non_drug_DJ,alternative='less', equal_var=True)
+print(p_value_DJ)
+#scipy.stats.ttest_ind(avg_prox, avg_prox_false, equal_var=False)
