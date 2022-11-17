@@ -531,3 +531,65 @@ ax, test_results = add_stat_annotation(ax, data=df_SP, x=x2, y=y2, order=order2,
 sns.despine()
 #plt.title("Parkinson's disease")
 
+# NES 분포
+import seaborn as sns
+
+sns.distplot(abs(gs_res_final.res2d['NES']))
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa05012']['NES'].values[0]), 0, 2, color='g', linestyle='--', linewidth=0.5)
+
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04728']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04728 - Dopaminergic synapse
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04210']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04210 - Apoptosis
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04141']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04141 - Protein processing in endoplasmic reticulum
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04020']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04020 - Calcium signaling pathway
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04137']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04137 - Mitophagy
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04140']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04140 - Autophagy
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04068']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04068 - foxO signaling
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04010']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04010 – MAPK signaling pathway
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04064']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04064 – NF-kappa B signaling pathway
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04150']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04150 – mTOR signaling pathway
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04152']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04152 – AMPK signaling pathway
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04151']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04151 – PI3K-Akt signaling
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04310']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa04310 – Wnt signaling pathway
+# plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04060']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # hsa4060 – cytokine-cytokine receptor interaction
+# plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04062']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # chemokine signaling pathway
+# plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04145']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Phagosome
+# plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04810']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Regulation of actine cytoskeleton
+# plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04144']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Endocytosis
+# plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04540']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Gap junction
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04510']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Focal adhesion
+# plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04611']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Platelet activation
+# plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04022']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # cGMP-PKG signaling pathway
+# plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04512']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # ECM-receptor interaction
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa05010']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Cocaine addiction
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa05030']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Alzheimer disease
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa05022']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Pathways of neurodegeneration
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04360']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Axon guidance
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04350']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # TGF-beta signaling pathway
+plt.axvline(abs(gs_res_final.res2d[gs_res_final.res2d['Term'] == 'hsa04668']['NES'].values[0]), 0, 2, color='r', linestyle='--', linewidth=0.5) # Neuroinflammation - TNF signaling pathway
+
+plt.legend(['NES distribution','Parkinsons disease', 'PD related pathways'])
+
+pd_pathway = ['hsa05012', 'hsa04728', 'hsa04210', 'hsa04141', 'hsa04020', 'hsa04137', 'hsa04140', 'hsa04068', 'hsa04010', 'hsa04064', 'hsa04150', 'hsa04152',
+             'hsa04151', 'hsa04310', 'hsa04310', 'hsa04510', 'hsa05010', 'hsa05030', 'hsa05022', 'hsa04360', 'hsa04350', 'hsa04668']
+
+non_pd_pathway = []
+for term in gs_res2.res2d['Term']:
+    if term not in pd_pathway:
+        non_pd_pathway.append(term)
+        
+pd_NES = []
+for pd in pd_pathway:
+    pd_NES.append(abs(gs_res2.res2d[gs_res2.res2d['Term'] == pd]['NES'].values[0]))
+
+non_pd_NES = []
+for non_pd in non_pd_pathway:
+    non_pd_NES.append(abs(gs_res2.res2d[gs_res2.res2d['Term'] == non_pd]['NES'].values[0]))
+
+scipy.stats.ttest_ind(pd_NES, non_pd_NES, equal_var=False)
+
+ratio = [len(non_pd_pathway), len(pd_pathway)]
+labels = ['Random pathway', 'PD pathway']
+
+plt.pie(ratio, labels=labels, autopct='%.1f%%')
+plt.show()
+
